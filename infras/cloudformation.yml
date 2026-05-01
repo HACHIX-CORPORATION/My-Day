@@ -187,13 +187,25 @@ Resources:
           set -euxo pipefail
           exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
 
+          # Always signal CloudFormation on exit — success or failure.
+          # Without this trap, any 'set -e' early exit leaves CloudFormation
+          # waiting until the CreationPolicy timeout expires.
+          trap '/opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource MyDayEC2Instance' EXIT
+
           echo "================================================================"
           echo " MyDay EC2 Bootstrap — $(date)"
           echo "================================================================"
 
           # ── 1. System updates ────────────────────────────────────────────────
           yum update -y
-          yum install -y git
+          yum install -y git aws-cfn-bootstrap
+
+          # Add 2 GB swap — prevents OOM during npm run build on t3.micro/t2.micro.
+          dd if=/dev/zero of=/swapfile bs=128M count=16
+          chmod 600 /swapfile
+          mkswap /swapfile
+          swapon /swapfile
+          echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
 
           # ── 2. Node.js 18 via NodeSource ─────────────────────────────────────
           curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
@@ -262,7 +274,7 @@ Resources:
           # ── 8. Build React frontend ──────────────────────────────────────────
           cd "$APP_DIR/frontend"
           sudo -u ec2-user npm ci --prefer-offline
-          sudo -u ec2-user npm run build
+          sudo -u ec2-user env NODE_OPTIONS=--max-old-space-size=768 npm run build
 
           # ── 9. Copy build output to backend/public (served by Express) ───────
           mkdir -p "$APP_DIR/backend/public"
@@ -332,12 +344,7 @@ Resources:
           echo "================================================================"
           echo " Bootstrap complete — $(date)"
           echo "================================================================"
-
-          # Signal CloudFormation that UserData succeeded
-          /opt/aws/bin/cfn-signal -e 0 \
-            --stack  ${AWS::StackName} \
-            --region ${AWS::Region} \
-            --resource MyDayEC2Instance
+          # cfn-signal is sent automatically by the EXIT trap above.
 
   # ── Elastic IP ───────────────────────────────────────────────────────────────
   MyDayElasticIP:
