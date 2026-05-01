@@ -1,0 +1,392 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  MyDay (Monday.com Clone) — Single EC2 deployment.
+  MERN stack: React SPA served statically by Express on port 3030,
+  fronted by Nginx reverse proxy. MongoDB 6.0 runs locally on the same instance.
+  PM2 manages the Node.js process. ElasticIP provides a stable public address.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PARAMETERS
+# ─────────────────────────────────────────────────────────────────────────────
+Parameters:
+
+  KeyPairName:
+    Type: String
+    Default: ''
+    Description: >
+      Name of an existing EC2 key pair for SSH access.
+      Leave empty to use SSM Session Manager only (no port 22 needed).
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t2.micro
+    Description: EC2 instance type. t3.micro / t2.micro are free-tier eligible.
+
+  MongoDBName:
+    Type: String
+    Default: monday_DB
+    Description: MongoDB database name.
+
+  SecretKey:
+    Type: String
+    NoEcho: true
+    Description: >
+      Encryption secret for Cryptr / JWT signing (SECRET1 env var).
+      Use a random string of at least 16 characters.
+    MinLength: 8
+
+  GitHubRepoURL:
+    Type: String
+    Default: 'https://github.com/HACHIX-CORPORATION/My-Day.git'
+    Description: HTTPS URL of the GitHub repository to clone.
+
+  GitBranch:
+    Type: String
+    Default: main
+    Description: Git branch to deploy.
+
+  GoogleClientId:
+    Type: String
+    Default: ''
+    Description: >
+      (Optional) Google OAuth Client ID for Google Login.
+      Can be updated later via a stack update.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONDITIONS
+# ─────────────────────────────────────────────────────────────────────────────
+Conditions:
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, '']]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAPPINGS  (Amazon Linux 2 AMI per region)
+# ─────────────────────────────────────────────────────────────────────────────
+Mappings:
+  RegionAMI:
+    us-east-1:
+      AmazonLinux2: ami-0c02fb55956c7d316
+    us-east-2:
+      AmazonLinux2: ami-0568936c8d2b91c4e
+    us-west-1:
+      AmazonLinux2: ami-04fde5f8e84ade53f
+    us-west-2:
+      AmazonLinux2: ami-0747bdcabd34c712a
+    eu-west-1:
+      AmazonLinux2: ami-06ce3edf0cff21f07
+    eu-west-2:
+      AmazonLinux2: ami-01a6e31ac994bbc09
+    eu-central-1:
+      AmazonLinux2: ami-0a1ee2fb28fe05df3
+    ap-southeast-1:
+      AmazonLinux2: ami-0df7a207adb9748c7
+    ap-southeast-2:
+      AmazonLinux2: ami-0310483fb2b488153
+    ap-northeast-1:
+      AmazonLinux2: ami-0b276ad63ba2d6009
+    ap-south-1:
+      AmazonLinux2: ami-0851b76e8b1bce90b
+    sa-east-1:
+      AmazonLinux2: ami-09c4b5f397e8b680f
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RESOURCES
+# ─────────────────────────────────────────────────────────────────────────────
+Resources:
+
+  # ── Security Group ──────────────────────────────────────────────────────────
+  MyDaySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 'myday-sg-${AWS::StackName}'
+      GroupDescription: MyDay application security group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '0.0.0.0/0'
+          Description: SSH access
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '0.0.0.0/0'
+          Description: HTTP via Nginx
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: '0.0.0.0/0'
+          Description: HTTPS (after TLS cert is attached)
+        - IpProtocol: tcp
+          FromPort: 3030
+          ToPort: 3030
+          CidrIp: '0.0.0.0/0'
+          Description: Direct Node.js port for debugging
+      Tags:
+        - Key: Name
+          Value: !Sub 'myday-sg-${AWS::StackName}'
+        - Key: Project
+          Value: MyDay
+
+  # ── IAM Role (enables SSM Session Manager) ──────────────────────────────────
+  MyDayInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'myday-ec2-role-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Project
+          Value: MyDay
+
+  MyDayInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub 'myday-ec2-profile-${AWS::StackName}'
+      Roles:
+        - !Ref MyDayInstanceRole
+
+  # ── EC2 Instance ─────────────────────────────────────────────────────────────
+  MyDayEC2Instance:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT25M
+    Properties:
+      ImageId: !FindInMap [RegionAMI, !Ref 'AWS::Region', AmazonLinux2]
+      InstanceType: !Ref InstanceType
+      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref 'AWS::NoValue']
+      IamInstanceProfile: !Ref MyDayInstanceProfile
+      SecurityGroups:
+        - !Ref MyDaySecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 30
+            VolumeType: gp3
+            DeleteOnTermination: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'myday-server-${AWS::StackName}'
+        - Key: Project
+          Value: MyDay
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
+
+          echo "================================================================"
+          echo " MyDay EC2 Bootstrap — $(date)"
+          echo "================================================================"
+
+          # ── 1. System updates ────────────────────────────────────────────────
+          yum update -y
+          yum install -y git
+
+          # ── 2. Node.js 18 via NodeSource ─────────────────────────────────────
+          curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+          yum install -y nodejs
+          node --version
+          npm --version
+
+          # ── 3. MongoDB 6.0 ───────────────────────────────────────────────────
+          cat > /etc/yum.repos.d/mongodb-org-6.0.repo <<'MONGOREPO'
+          [mongodb-org-6.0]
+          name=MongoDB Repository
+          baseurl=https://repo.mongodb.org/yum/amazon/2/mongodb-org/6.0/x86_64/
+          gpgcheck=1
+          enabled=1
+          gpgkey=https://pgp.mongodb.com/server-6.0.asc
+          MONGOREPO
+
+          yum install -y mongodb-org
+
+          # Bind only to localhost — port 27017 is never exposed publicly.
+          sed -i 's/bindIp: 127.0.0.1/bindIp: 127.0.0.1/' /etc/mongod.conf
+
+          systemctl enable mongod
+          systemctl start mongod
+
+          # Wait up to 30 s for mongod to become ready
+          for i in $(seq 1 30); do
+            mongosh --eval "db.runCommand({ ping: 1 })" --quiet && break
+            sleep 1
+          done
+
+          # ── 4. Nginx + PM2 ───────────────────────────────────────────────────
+          amazon-linux-extras install nginx1 -y || yum install -y nginx
+          npm install -g pm2
+
+          # ── 5. Write app environment file ────────────────────────────────────
+          APP_ENV=/home/ec2-user/.env
+          mkdir -p /home/ec2-user/logs
+          cat > "$APP_ENV" <<ENVEOF
+          NODE_ENV=production
+          PORT=3030
+          MONGODB_URI=mongodb://localhost:27017
+          MONGODB_DB_NAME=${MongoDBName}
+          SECRET1=${SecretKey}
+          GOOGLE_CLIENT_ID=${GoogleClientId}
+          ENVEOF
+          chmod 600 "$APP_ENV"
+          chown ec2-user:ec2-user "$APP_ENV"
+
+          # ── 6. Clone the repository ──────────────────────────────────────────
+          APP_DIR=/home/ec2-user/app
+          git clone --branch ${GitBranch} --depth 1 ${GitHubRepoURL} "$APP_DIR"
+          chown -R ec2-user:ec2-user "$APP_DIR"
+
+          # ── 7. Patch backend/config/prod.js to read from env vars ────────────
+          # The original file hardcodes the MongoDB URI; overwrite it so the
+          # connection string is taken from environment variables instead.
+          cat > "$APP_DIR/backend/config/prod.js" <<'PRODCFG'
+          module.exports = {
+            dbURL: process.env.MONGODB_URI,
+            dbName: process.env.MONGODB_DB_NAME || 'monday_DB'
+          }
+          PRODCFG
+          chown ec2-user:ec2-user "$APP_DIR/backend/config/prod.js"
+
+          # ── 8. Build React frontend ──────────────────────────────────────────
+          cd "$APP_DIR/frontend"
+          sudo -u ec2-user npm ci --prefer-offline
+          sudo -u ec2-user npm run build
+
+          # ── 9. Copy build output to backend/public (served by Express) ───────
+          mkdir -p "$APP_DIR/backend/public"
+          cp -r "$APP_DIR/frontend/build/." "$APP_DIR/backend/public/"
+          chown -R ec2-user:ec2-user "$APP_DIR/backend/public"
+
+          # ── 10. Install backend dependencies ─────────────────────────────────
+          cd "$APP_DIR/backend"
+          sudo -u ec2-user npm ci --prefer-offline
+
+          # ── 11. Configure Nginx as reverse proxy ─────────────────────────────
+          # Includes WebSocket upgrade headers required by Socket.io.
+          rm -f /etc/nginx/conf.d/default.conf
+
+          cat > /etc/nginx/conf.d/myday.conf <<'NGINXCFG'
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+              server_name _;
+
+              proxy_http_version 1.1;
+              proxy_read_timeout 3600s;
+              proxy_send_timeout 3600s;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+
+              location / {
+                  proxy_pass http://127.0.0.1:3030;
+              }
+
+              location /health {
+                  access_log off;
+                  return 200 "OK\n";
+                  add_header Content-Type text/plain;
+              }
+          }
+          NGINXCFG
+
+          nginx -t
+
+          # ── 12. Start the app with PM2 ────────────────────────────────────────
+          sudo -u ec2-user bash -c "
+            set -a
+            source /home/ec2-user/.env
+            set +a
+            cd /home/ec2-user/app/backend
+            pm2 start server.js \
+              --name my-day \
+              --log /home/ec2-user/logs/myday.log \
+              --error /home/ec2-user/logs/myday-error.log \
+              --merge-logs
+            pm2 save
+          "
+
+          # ── 13. Wire PM2 to systemd so it survives reboots ───────────────────
+          env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user
+          sudo -u ec2-user pm2 save
+
+          # ── 14. Enable and start Nginx ───────────────────────────────────────
+          systemctl enable nginx
+          systemctl start nginx
+
+          echo "================================================================"
+          echo " Bootstrap complete — $(date)"
+          echo "================================================================"
+
+          # Signal CloudFormation that UserData succeeded
+          /opt/aws/bin/cfn-signal -e 0 \
+            --stack  ${AWS::StackName} \
+            --region ${AWS::Region} \
+            --resource MyDayEC2Instance
+
+  # ── Elastic IP ───────────────────────────────────────────────────────────────
+  MyDayElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub 'myday-eip-${AWS::StackName}'
+        - Key: Project
+          Value: MyDay
+
+  MyDayEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref MyDayEC2Instance
+      EIP: !Ref MyDayElasticIP
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OUTPUTS
+# ─────────────────────────────────────────────────────────────────────────────
+Outputs:
+
+  PublicIP:
+    Description: Static Elastic IP address of the MyDay server
+    Value: !Ref MyDayElasticIP
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicIP'
+
+  AppURL:
+    Description: Application URL (HTTP). Set up HTTPS after attaching a TLS cert.
+    Value: !Sub 'http://${MyDayElasticIP}'
+    Export:
+      Name: !Sub '${AWS::StackName}-AppURL'
+
+  SSHCommand:
+    Description: SSH command (requires KeyPairName parameter to be set)
+    Value: !Sub 'ssh -i ~/.ssh/${KeyPairName}.pem ec2-user@${MyDayElasticIP}'
+
+  SSMCommand:
+    Description: AWS CLI command to open a Session Manager shell (no key pair needed)
+    Value: !Sub 'aws ssm start-session --target ${MyDayEC2Instance} --region ${AWS::Region}'
+
+  InstanceId:
+    Description: EC2 instance ID
+    Value: !Ref MyDayEC2Instance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+
+  UserDataLog:
+    Description: Bootstrap log path inside the instance
+    Value: /var/log/user-data.log
