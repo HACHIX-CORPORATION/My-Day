@@ -1,0 +1,131 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual deploy'
+        required: false
+        default: 'Manual trigger'
+
+# Cancel any in-progress deploy when a new push arrives.
+# Without this, two simultaneous git-reset + npm-ci runs corrupt node_modules.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+permissions:
+  id-token: write  # required to request the OIDC JWT
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to EC2 via SSM
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: GitHubActions-MyDay-Deploy
+
+      - name: Get EC2 instance ID from CloudFormation
+        id: get-instance
+        run: |
+          INSTANCE_ID=$(aws cloudformation describe-stacks \
+            --stack-name "${{ vars.STACK_NAME }}" \
+            --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" \
+            --output text)
+          echo "instance_id=${INSTANCE_ID}" >> "$GITHUB_OUTPUT"
+          echo "Deploying to instance: ${INSTANCE_ID}"
+
+      - name: Send deployment command via SSM
+        id: send-command
+        run: |
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ steps.get-instance.outputs.instance_id }}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy ${{ github.sha }} by ${{ github.actor }}" \
+            --parameters 'commands=[
+              "set -euxo pipefail",
+              "cd /home/ec2-user/app",
+              "sudo -u ec2-user git fetch origin main",
+              "sudo -u ec2-user git reset --hard origin/main",
+              "cd /home/ec2-user/app/frontend",
+              "sudo -u ec2-user npm ci --prefer-offline",
+              "sudo -u ec2-user env NODE_OPTIONS=--max-old-space-size=1536 npm run build",
+              "rm -rf /home/ec2-user/app/backend/public/*",
+              "cp -r /home/ec2-user/app/frontend/build/. /home/ec2-user/app/backend/public/",
+              "chown -R ec2-user:ec2-user /home/ec2-user/app/backend/public",
+              "cd /home/ec2-user/app/backend",
+              "sudo -u ec2-user npm ci --prefer-offline",
+              "sudo -u ec2-user pm2 restart my-day --update-env",
+              "sudo -u ec2-user pm2 save",
+              "echo DEPLOY_OK"
+            ]' \
+            --timeout-seconds 600 \
+            --query "Command.CommandId" \
+            --output text)
+          echo "command_id=${COMMAND_ID}" >> "$GITHUB_OUTPUT"
+          echo "SSM command sent: ${COMMAND_ID}"
+
+      - name: Wait for deployment to complete
+        run: |
+          INSTANCE_ID="${{ steps.get-instance.outputs.instance_id }}"
+          COMMAND_ID="${{ steps.send-command.outputs.command_id }}"
+
+          echo "Polling command ${COMMAND_ID} on ${INSTANCE_ID}..."
+
+          for i in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "${COMMAND_ID}" \
+              --instance-id "${INSTANCE_ID}" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+
+            echo "[${i}/60] Status: ${STATUS}"
+
+            case "${STATUS}" in
+              Success)
+                echo "Deployment succeeded."
+                aws ssm get-command-invocation \
+                  --command-id "${COMMAND_ID}" \
+                  --instance-id "${INSTANCE_ID}" \
+                  --query "StandardOutputContent" \
+                  --output text
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut|DeliveryTimedOut|ExecutionTimedOut|Undeliverable|Terminated|InvalidPlatform)
+                echo "Deployment FAILED — status: ${STATUS}"
+                echo "=== STDOUT ==="
+                aws ssm get-command-invocation \
+                  --command-id "${COMMAND_ID}" \
+                  --instance-id "${INSTANCE_ID}" \
+                  --query "StandardOutputContent" \
+                  --output text || true
+                echo "=== STDERR ==="
+                aws ssm get-command-invocation \
+                  --command-id "${COMMAND_ID}" \
+                  --instance-id "${INSTANCE_ID}" \
+                  --query "StandardErrorContent" \
+                  --output text || true
+                exit 1
+                ;;
+              Pending|InProgress|Delayed)
+                sleep 10
+                ;;
+              *)
+                echo "Unknown status '${STATUS}', retrying..."
+                sleep 10
+                ;;
+            esac
+          done
+
+          echo "Timeout: command did not complete within 600 seconds"
+          exit 1
