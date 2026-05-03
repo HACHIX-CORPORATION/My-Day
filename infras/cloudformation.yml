@@ -132,6 +132,9 @@ Resources:
                 Condition:
                   StringEquals:
                     'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub 'arn:aws:s3:::${MyDayDeployBucket}/*'
       Tags:
         - Key: Project
           Value: MyDay
@@ -178,6 +181,14 @@ Resources:
               - Effect: Allow
                 Action: cloudformation:DescribeStacks
                 Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*'
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: !Sub 'arn:aws:s3:::${MyDayDeployBucket}/*'
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub 'arn:aws:s3:::${MyDayDeployBucket}'
       Tags:
         - Key: Project
           Value: MyDay
@@ -429,6 +440,22 @@ Resources:
       InstanceId: !Ref MyDayEC2Instance
       EIP: !Ref MyDayElasticIP
 
+  # -- S3 Bucket (deploy artifacts) --------------------------------------------
+  # GitHub Actions uploads the pre-built frontend tar.gz here; EC2 downloads it
+  # via SSM so the slow npm run build never runs on the instance.
+  MyDayDeployBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'myday-deploy-${AWS::AccountId}-${AWS::Region}-${AWS::StackName}'
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 7
+      Tags:
+        - Key: Project
+          Value: MyDay
+
 # -----------------------------------------------------------------------------
 # OUTPUTS
 # -----------------------------------------------------------------------------
@@ -468,6 +495,12 @@ Outputs:
     Value: !GetAtt GitHubActionsRole.Arn
     Export:
       Name: !Sub '${AWS::StackName}-GitHubActionsRoleArn'
+
+  DeployBucketName:
+    Description: S3 bucket used by GitHub Actions to upload frontend build artifacts
+    Value: !Ref MyDayDeployBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-DeployBucketName'
 
   UserDataLog:
     Description: Bootstrap log path inside the instance
