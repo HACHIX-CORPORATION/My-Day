@@ -35,6 +35,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Build frontend
+        env:
+          CI: false
         run: |
           cd frontend
           npm ci
