@@ -397,13 +397,13 @@ Resources:
           nginx -t
 
           # -- 13. Start the app with PM2 ---------------------------------------
-          # --env-file is used so PM2 always reloads vars from .env on process
-          # restarts and reboots, not just the initial bootstrap shell session.
           sudo -u ec2-user bash -c "
+            set -a
+            source /home/ec2-user/.env
+            set +a
             cd /home/ec2-user/app/backend
             pm2 start server.js \
               --name my-day \
-              --env-file /home/ec2-user/.env \
               --log /home/ec2-user/logs/myday.log \
               --error /home/ec2-user/logs/myday-error.log \
               --merge-logs

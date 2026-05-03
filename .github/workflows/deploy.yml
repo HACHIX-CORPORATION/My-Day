@@ -98,7 +98,7 @@ jobs:
               \"rm /tmp/frontend-build.tar.gz\",
               \"cd /home/ec2-user/app/backend\",
               \"sudo -u ec2-user npm ci --prefer-offline\",
-              \"sudo -u ec2-user bash -c 'pm2 restart my-day --update-env || pm2 start /home/ec2-user/app/backend/server.js --name my-day --env-file /home/ec2-user/.env --log /home/ec2-user/logs/myday.log --error /home/ec2-user/logs/myday-error.log --merge-logs'\",
+              \"sudo -u ec2-user bash -c 'set -a; source /home/ec2-user/.env; set +a; pm2 restart my-day --update-env 2>/dev/null || pm2 start /home/ec2-user/app/backend/server.js --name my-day --log /home/ec2-user/logs/myday.log --error /home/ec2-user/logs/myday-error.log --merge-logs'\",
               \"sudo -u ec2-user pm2 save\",
               \"echo DEPLOY_OK\"
             ]" \
