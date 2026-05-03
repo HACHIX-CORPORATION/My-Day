@@ -1,4 +1,5 @@
 import { boardService } from '../services/board.service.js'
+import { importService } from '../services/import.service.js'
 
 import { store } from './store.js'
 import { SET_FILTER_BOARD, SET_BOARDS, SET_BOARD, REMOVE_BOARD, ADD_BOARD, UPDATE_BOARD, SET_FILTER, SET_MODAL, REMOVE_GROUP, SET_DYNAMIC_MODAL } from "./board.reducer.js"
@@ -84,6 +85,26 @@ export async function updatePickerCmpsOrder(filteredBoard, cmpsOrders) {
         store.dispatch({ type: SET_BOARD, board })
         store.dispatch({ type: SET_FILTER_BOARD, filteredBoard })
         socketService.emit(SOCKET_EMIT_SEND_UPDATE_BOARD, { filteredBoard, board })
+    } catch (err) {
+        throw err
+    }
+}
+
+export async function importGroupsToBoard(fileBuffer, filteredBoard) {
+    try {
+        const { board } = store.getState().boardModule
+        const { groups } = importService.parseMondayXLSX(fileBuffer)
+        const newGroups = groups.map(g => ({
+            ...boardService.getEmptyGroup(),
+            id: utilService.makeId(),
+            title: g.title,
+            tasks: g.tasks,
+        }))
+        board.groups.unshift(...newGroups)
+        await boardService.save(board)
+        store.dispatch({ type: SET_BOARD, board })
+        store.dispatch({ type: SET_FILTER_BOARD, filteredBoard: board })
+        socketService.emit(SOCKET_EMIT_SEND_UPDATE_BOARD, { filteredBoard: board, board })
     } catch (err) {
         throw err
     }

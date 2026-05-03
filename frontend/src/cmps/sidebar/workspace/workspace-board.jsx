@@ -1,12 +1,15 @@
-import React from 'react'
+import React, { useState } from 'react'
 
 import { BsFillLightningFill } from 'react-icons/bs'
 import { IoIosArrowDown } from 'react-icons/io'
 import { AiOutlinePlus, AiOutlineSearch } from 'react-icons/ai'
 import { AiFillHome } from 'react-icons/ai'
+import { MdOutlineFileUpload } from 'react-icons/md'
 import { BoardPreview } from '../../board/board-preview'
+import { ImportBoardModal } from '../../modal/import-board-modal'
 
 export default function WorkspaceBoard({handleChange , filterByToEdit, setIsCreateModalOpen, boards}) {
+  const [isImportOpen, setIsImportOpen] = useState(false)
 
   return (
       <div className="workspace-sidebar-header">
@@ -29,6 +32,10 @@ export default function WorkspaceBoard({handleChange , filterByToEdit, setIsCrea
                   <AiOutlinePlus className='icon' />
                   <span>Add</span>
               </div>
+              <div onClick={() => setIsImportOpen(true)}>
+                  <MdOutlineFileUpload className='icon' />
+                  <span>Import</span>
+              </div>
               <div className='search-board'>
                   <div className='flex'>
                       <AiOutlineSearch className='icon' />
@@ -50,6 +57,7 @@ export default function WorkspaceBoard({handleChange , filterByToEdit, setIsCrea
               </li>
           })}
       </ul>
+      {isImportOpen && <ImportBoardModal onClose={() => setIsImportOpen(false)} />}
   </div>
   )
 }

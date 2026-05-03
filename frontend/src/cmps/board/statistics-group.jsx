@@ -4,6 +4,7 @@ export function StatisticGroup({ cmpType, group, board }) {
             return board.labels.find(label => label.title === task[cmp])
         })
         const mapLabel = labels.reduce((acc, label) => {
+            if (!label) return acc
             if (acc[label.color]) acc[label.color]++
             else acc[label.color] = 1
             return acc
