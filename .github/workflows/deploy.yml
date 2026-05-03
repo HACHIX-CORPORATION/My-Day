@@ -61,6 +61,13 @@ jobs:
           INSTANCE_ID=$(echo "$OUTPUTS" | jq -r '.[] | select(.OutputKey=="InstanceId") | .OutputValue')
           BUCKET=$(echo "$OUTPUTS" | jq -r '.[] | select(.OutputKey=="DeployBucketName") | .OutputValue')
 
+          if [[ -z "${BUCKET}" ]]; then
+            echo "::error::DeployBucketName not found in CloudFormation outputs."
+            echo "::error::Update the stack with the latest template before deploying:"
+            echo "::error::aws cloudformation update-stack --stack-name ${{ vars.STACK_NAME }} --template-body file://infras/cloudformation.yml --capabilities CAPABILITY_NAMED_IAM --region ${{ vars.AWS_REGION }}"
+            exit 1
+          fi
+
           echo "instance_id=${INSTANCE_ID}" >> "$GITHUB_OUTPUT"
           echo "bucket=${BUCKET}"           >> "$GITHUB_OUTPUT"
           echo "Deploying to instance: ${INSTANCE_ID}, bucket: ${BUCKET}"
