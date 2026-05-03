@@ -1,13 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MyDay (Monday.com Clone) — Single EC2 deployment.
+  MyDay (Monday.com Clone) - Single EC2 deployment.
   MERN stack: React SPA served statically by Express on port 3030,
   fronted by Nginx reverse proxy. MongoDB 6.0 runs locally on the same instance.
   PM2 manages the Node.js process. ElasticIP provides a stable public address.
+  GitHub Actions CI/CD via AWS OIDC + SSM Run Command (no SSH keys needed).
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # PARAMETERS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 Parameters:
 
   KeyPairName:
@@ -32,13 +33,20 @@ Parameters:
     Default: monday_DB
     Description: MongoDB database name.
 
-  SecretKey:
+  SecretKeySSMPath:
     Type: String
-    NoEcho: true
+    Default: '/myday/prod/secret1'
     Description: >
-      Encryption secret for Cryptr / JWT signing (SECRET1 env var).
-      Use a random string of at least 16 characters.
-    MinLength: 8
+      SSM Parameter Store path for the Cryptr/JWT secret (must be a SecureString).
+      Pre-create before deploying: aws ssm put-parameter --name /myday/prod/secret1
+      --type SecureString --value "$(openssl rand -base64 32)"
+
+  GoogleClientIdSSMPath:
+    Type: String
+    Default: '/myday/prod/google_client_id'
+    Description: >
+      SSM Parameter Store path for the Google OAuth Client ID (String type, optional).
+      If the parameter does not exist the app starts without Google Login - no error.
 
   GitHubRepoURL:
     Type: String
@@ -50,66 +58,34 @@ Parameters:
     Default: main
     Description: Git branch to deploy.
 
-  GoogleClientId:
+  GitHubRepoOrg:
     Type: String
-    Default: ''
+    Default: 'HACHIX-CORPORATION/My-Day'
     Description: >
-      (Optional) Google OAuth Client ID for Google Login.
-      Can be updated later via a stack update.
+      GitHub repository in the form Owner/Repo used to scope the GitHub Actions
+      OIDC trust condition (e.g. HACHIX-CORPORATION/My-Day).
 
-# ─────────────────────────────────────────────────────────────────────────────
+
+# -----------------------------------------------------------------------------
 # CONDITIONS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 Conditions:
   HasKeyPair: !Not [!Equals [!Ref KeyPairName, '']]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAPPINGS  (Amazon Linux 2 AMI per region)
-# ─────────────────────────────────────────────────────────────────────────────
-Mappings:
-  RegionAMI:
-    us-east-1:
-      AmazonLinux2: ami-0c02fb55956c7d316
-    us-east-2:
-      AmazonLinux2: ami-0568936c8d2b91c4e
-    us-west-1:
-      AmazonLinux2: ami-04fde5f8e84ade53f
-    us-west-2:
-      AmazonLinux2: ami-0747bdcabd34c712a
-    eu-west-1:
-      AmazonLinux2: ami-06ce3edf0cff21f07
-    eu-west-2:
-      AmazonLinux2: ami-01a6e31ac994bbc09
-    eu-central-1:
-      AmazonLinux2: ami-0a1ee2fb28fe05df3
-    ap-southeast-1:
-      AmazonLinux2: ami-0df7a207adb9748c7
-    ap-southeast-2:
-      AmazonLinux2: ami-0310483fb2b488153
-    ap-northeast-1:
-      AmazonLinux2: ami-0b276ad63ba2d6009
-    ap-south-1:
-      AmazonLinux2: ami-0851b76e8b1bce90b
-    sa-east-1:
-      AmazonLinux2: ami-09c4b5f397e8b680f
-
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # RESOURCES
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 Resources:
 
-  # ── Security Group ──────────────────────────────────────────────────────────
+  # -- Security Group ----------------------------------------------------------
+  # Port 22 omitted - use SSM Session Manager for shell access (no key needed).
+  # Port 3030 omitted - internal Node.js port, proxied by Nginx; never public.
   MyDaySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: !Sub 'myday-sg-${AWS::StackName}'
       GroupDescription: MyDay application security group
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: '0.0.0.0/0'
-          Description: SSH access
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
@@ -120,18 +96,13 @@ Resources:
           ToPort: 443
           CidrIp: '0.0.0.0/0'
           Description: HTTPS (after TLS cert is attached)
-        - IpProtocol: tcp
-          FromPort: 3030
-          ToPort: 3030
-          CidrIp: '0.0.0.0/0'
-          Description: Direct Node.js port for debugging
       Tags:
         - Key: Name
           Value: !Sub 'myday-sg-${AWS::StackName}'
         - Key: Project
           Value: MyDay
 
-  # ── IAM Role (enables SSM Session Manager) ──────────────────────────────────
+  # -- IAM Role (enables SSM Session Manager + SSM Parameter Store reads) ------
   MyDayInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -145,6 +116,22 @@ Resources:
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: SSMParameterReadPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource:
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretKeySSMPath}'
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GoogleClientIdSSMPath}'
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'kms:ViaService': !Sub 'ssm.${AWS::Region}.amazonaws.com'
       Tags:
         - Key: Project
           Value: MyDay
@@ -156,15 +143,56 @@ Resources:
       Roles:
         - !Ref MyDayInstanceRole
 
-  # ── EC2 Instance ─────────────────────────────────────────────────────────────
+  # -- GitHub Actions IAM Role -------------------------------------------------
+  # Trusted only by the HACHIX-CORPORATION/My-Day repo on the main branch.
+  # Permissions: send SSM commands to this EC2 instance + poll their status.
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'myday-github-actions-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: 'sts:AssumeRoleWithWebIdentity'
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com'
+                'token.actions.githubusercontent.com:sub':
+                  !Sub 'repo:${GitHubRepoOrg}:ref:refs/heads/main'
+      Policies:
+        - PolicyName: SSMDeployPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ssm:SendCommand
+                Resource:
+                  - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/${MyDayEC2Instance}'
+                  - !Sub 'arn:aws:ssm:${AWS::Region}::document/AWS-RunShellScript'
+              - Effect: Allow
+                Action: ssm:GetCommandInvocation
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:*'
+              - Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*'
+      Tags:
+        - Key: Project
+          Value: MyDay
+
+  # -- EC2 Instance ------------------------------------------------------------
   MyDayEC2Instance:
     Type: AWS::EC2::Instance
     CreationPolicy:
       ResourceSignal:
         Count: 1
-        Timeout: PT25M
+        Timeout: PT60M
     Properties:
-      ImageId: !FindInMap [RegionAMI, !Ref 'AWS::Region', AmazonLinux2]
+      # Dynamic reference - always resolves to the latest Amazon Linux 2 AMI
+      # for the deployment region; no hardcoded AMI map needed.
+      ImageId: '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}'
       InstanceType: !Ref InstanceType
       KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref 'AWS::NoValue']
       IamInstanceProfile: !Ref MyDayInstanceProfile
@@ -187,33 +215,54 @@ Resources:
           set -euxo pipefail
           exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
 
-          # Always signal CloudFormation on exit — success or failure.
+          # Always signal CloudFormation on exit - success or failure.
           # Without this trap, any 'set -e' early exit leaves CloudFormation
           # waiting until the CreationPolicy timeout expires.
           trap '/opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource MyDayEC2Instance' EXIT
 
           echo "================================================================"
-          echo " MyDay EC2 Bootstrap — $(date)"
+          echo " MyDay EC2 Bootstrap - $(date)"
           echo "================================================================"
 
-          # ── 1. System updates ────────────────────────────────────────────────
+          # -- 0. Pre-flight: verify required SSM parameter exists --------------
+          # Fail immediately with a clear message rather than discovering the
+          # missing secret 10 minutes later in the middle of the install.
+          if ! aws ssm get-parameter \
+              --name ${SecretKeySSMPath} \
+              --with-decryption \
+              --region ${AWS::Region} \
+              --query Parameter.Value \
+              --output text > /dev/null 2>&1; then
+            echo "FATAL: SSM parameter '${SecretKeySSMPath}' not found." >&2
+            echo "Pre-create it before deploying the stack:" >&2
+            echo "  aws ssm put-parameter --name ${SecretKeySSMPath} --type SecureString --value YOUR_SECRET --region ${AWS::Region}" >&2
+            exit 1
+          fi
+          echo "SSM parameter ${SecretKeySSMPath} - OK"
+
+          # -- 1. System updates ------------------------------------------------
           yum update -y
           yum install -y git aws-cfn-bootstrap
 
-          # Add 2 GB swap — prevents OOM during npm run build on t3.micro/t2.micro.
-          dd if=/dev/zero of=/swapfile bs=128M count=16
+          # Add 4 GB swap - React build on t3.micro needs ~900 MB heap + OS overhead.
+          dd if=/dev/zero of=/swapfile bs=128M count=32
           chmod 600 /swapfile
           mkswap /swapfile
           swapon /swapfile
           echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
 
-          # ── 2. Node.js 18 via NodeSource ─────────────────────────────────────
-          curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+          # -- 2. Node.js 16 via NodeSource -------------------------------------
+          # Node.js 18+ RPMs from NodeSource require glibc >= 2.28.
+          # Amazon Linux 2 ships glibc 2.26, so Node.js 16 is the highest
+          # version that installs cleanly. Node 16 runs this stack without issues.
+          curl -fsSL https://rpm.nodesource.com/setup_16.x | bash -
           yum install -y nodejs
           node --version
           npm --version
+          node --version
+          npm --version
 
-          # ── 3. MongoDB 6.0 ───────────────────────────────────────────────────
+          # -- 3. MongoDB 6.0 ---------------------------------------------------
           cat > /etc/yum.repos.d/mongodb-org-6.0.repo <<'MONGOREPO'
           [mongodb-org-6.0]
           name=MongoDB Repository
@@ -225,7 +274,7 @@ Resources:
 
           yum install -y mongodb-org
 
-          # Bind only to localhost — port 27017 is never exposed publicly.
+          # Bind only to localhost - port 27017 is never exposed publicly.
           sed -i 's/bindIp: 127.0.0.1/bindIp: 127.0.0.1/' /etc/mongod.conf
 
           systemctl enable mongod
@@ -237,11 +286,28 @@ Resources:
             sleep 1
           done
 
-          # ── 4. Nginx + PM2 ───────────────────────────────────────────────────
+          # -- 4. Nginx + PM2 ---------------------------------------------------
           amazon-linux-extras install nginx1 -y || yum install -y nginx
-          npm install -g pm2
+          # Pin pm2 to v5 - pm2 v6+ requires Node >= 18; Node 16 is in use.
+          npm install -g pm2@5
 
-          # ── 5. Write app environment file ────────────────────────────────────
+          # -- 5. Fetch secrets from SSM Parameter Store ------------------------
+          # Secrets are stored in SSM as SecureString - never passed as plain-text
+          # CloudFormation parameters or embedded in UserData.
+          SECRET_VALUE=$(aws ssm get-parameter \
+            --name ${SecretKeySSMPath} \
+            --with-decryption \
+            --query Parameter.Value \
+            --output text \
+            --region ${AWS::Region})
+
+          GOOGLE_ID=$(aws ssm get-parameter \
+            --name ${GoogleClientIdSSMPath} \
+            --query Parameter.Value \
+            --output text \
+            --region ${AWS::Region} 2>/dev/null || echo '')
+
+          # -- 6. Write app environment file ------------------------------------
           APP_ENV=/home/ec2-user/.env
           mkdir -p /home/ec2-user/logs
           cat > "$APP_ENV" <<ENVEOF
@@ -249,18 +315,18 @@ Resources:
           PORT=3030
           MONGODB_URI=mongodb://localhost:27017
           MONGODB_DB_NAME=${MongoDBName}
-          SECRET1=${SecretKey}
-          GOOGLE_CLIENT_ID=${GoogleClientId}
+          SECRET1=${!SECRET_VALUE}
+          GOOGLE_CLIENT_ID=${!GOOGLE_ID}
           ENVEOF
           chmod 600 "$APP_ENV"
           chown ec2-user:ec2-user "$APP_ENV"
 
-          # ── 6. Clone the repository ──────────────────────────────────────────
+          # -- 7. Clone the repository ------------------------------------------
           APP_DIR=/home/ec2-user/app
           git clone --branch ${GitBranch} --depth 1 ${GitHubRepoURL} "$APP_DIR"
           chown -R ec2-user:ec2-user "$APP_DIR"
 
-          # ── 7. Patch backend/config/prod.js to read from env vars ────────────
+          # -- 8. Patch backend/config/prod.js to read from env vars ------------
           # The original file hardcodes the MongoDB URI; overwrite it so the
           # connection string is taken from environment variables instead.
           cat > "$APP_DIR/backend/config/prod.js" <<'PRODCFG'
@@ -271,21 +337,21 @@ Resources:
           PRODCFG
           chown ec2-user:ec2-user "$APP_DIR/backend/config/prod.js"
 
-          # ── 8. Build React frontend ──────────────────────────────────────────
+          # -- 9. Build React frontend ------------------------------------------
           cd "$APP_DIR/frontend"
           sudo -u ec2-user npm ci --prefer-offline
-          sudo -u ec2-user env NODE_OPTIONS=--max-old-space-size=768 npm run build
+          sudo -u ec2-user env NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
-          # ── 9. Copy build output to backend/public (served by Express) ───────
+          # -- 10. Copy build output to backend/public (served by Express) ------
           mkdir -p "$APP_DIR/backend/public"
           cp -r "$APP_DIR/frontend/build/." "$APP_DIR/backend/public/"
           chown -R ec2-user:ec2-user "$APP_DIR/backend/public"
 
-          # ── 10. Install backend dependencies ─────────────────────────────────
+          # -- 11. Install backend dependencies ---------------------------------
           cd "$APP_DIR/backend"
           sudo -u ec2-user npm ci --prefer-offline
 
-          # ── 11. Configure Nginx as reverse proxy ─────────────────────────────
+          # -- 12. Configure Nginx as reverse proxy -----------------------------
           # Includes WebSocket upgrade headers required by Socket.io.
           rm -f /etc/nginx/conf.d/default.conf
 
@@ -319,34 +385,34 @@ Resources:
 
           nginx -t
 
-          # ── 12. Start the app with PM2 ────────────────────────────────────────
+          # -- 13. Start the app with PM2 ---------------------------------------
+          # --env-file is used so PM2 always reloads vars from .env on process
+          # restarts and reboots, not just the initial bootstrap shell session.
           sudo -u ec2-user bash -c "
-            set -a
-            source /home/ec2-user/.env
-            set +a
             cd /home/ec2-user/app/backend
             pm2 start server.js \
               --name my-day \
+              --env-file /home/ec2-user/.env \
               --log /home/ec2-user/logs/myday.log \
               --error /home/ec2-user/logs/myday-error.log \
               --merge-logs
             pm2 save
           "
 
-          # ── 13. Wire PM2 to systemd so it survives reboots ───────────────────
+          # -- 14. Wire PM2 to systemd so it survives reboots -------------------
           env PATH=$PATH:/usr/bin pm2 startup systemd -u ec2-user --hp /home/ec2-user
           sudo -u ec2-user pm2 save
 
-          # ── 14. Enable and start Nginx ───────────────────────────────────────
+          # -- 15. Enable and start Nginx ---------------------------------------
           systemctl enable nginx
           systemctl start nginx
 
           echo "================================================================"
-          echo " Bootstrap complete — $(date)"
+          echo " Bootstrap complete - $(date)"
           echo "================================================================"
           # cfn-signal is sent automatically by the EXIT trap above.
 
-  # ── Elastic IP ───────────────────────────────────────────────────────────────
+  # -- Elastic IP --------------------------------------------------------------
   MyDayElasticIP:
     Type: AWS::EC2::EIP
     Properties:
@@ -363,9 +429,9 @@ Resources:
       InstanceId: !Ref MyDayEC2Instance
       EIP: !Ref MyDayElasticIP
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 # OUTPUTS
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 Outputs:
 
   PublicIP:
@@ -393,6 +459,15 @@ Outputs:
     Value: !Ref MyDayEC2Instance
     Export:
       Name: !Sub '${AWS::StackName}-InstanceId'
+
+  GitHubActionsRoleArn:
+    Description: >
+      IAM Role ARN for GitHub Actions OIDC authentication.
+      Set this as the AWS_ROLE_ARN variable in GitHub repository settings
+      (Settings -> Secrets and variables -> Actions -> Variables).
+    Value: !GetAtt GitHubActionsRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-GitHubActionsRoleArn'
 
   UserDataLog:
     Description: Bootstrap log path inside the instance
