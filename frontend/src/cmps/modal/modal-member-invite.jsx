@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useSelector } from "react-redux"
 
 import { loadBoard, saveBoard } from "../../store/board.actions"
+import { loadUsers } from "../../store/user.actions"
 
 import { VscTriangleUp } from 'react-icons/vsc'
 import { CiSearch } from 'react-icons/ci'
@@ -13,8 +14,12 @@ export function ModalMemberInvite({ board, setIsInviteModalOpen }) {
     const users = useSelector(storeState => storeState.userModule.users)
 
     useEffect(() => {
-        setOutBoardMembers(users.filter(user => !board.members.some(member => member._id === user._id)))
+        loadUsers()
     }, [])
+
+    useEffect(() => {
+        setOutBoardMembers(users.filter(user => !board.members.some(member => member._id === user._id)))
+    }, [users])
 
     async function onRemoveMember(removeMemberId) {
         try {
