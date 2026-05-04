@@ -39,6 +39,14 @@
         margin-bottom: $spacing-medium;
     }
 
+    .login-error {
+        width: 328px;
+        color: #d83a52;
+        font-size: rem(13px);
+        margin-bottom: $spacing-small;
+        text-align: left;
+    }
+
     .btn-next {
         text-align: center;
         width: 328px;

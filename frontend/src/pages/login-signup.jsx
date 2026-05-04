@@ -12,6 +12,7 @@ export function LoginSignup() {
     const [credentials, setCredentials] = useState({ username: '', password: '', fullname: '' })
     const [googleUser, setGoogleUser] = useState(null)
     const [isSignup, setIsSignup] = useState(false)
+    const [errorMsg, setErrorMsg] = useState('')
     const navigate = useNavigate()
     const boards = useSelector(storeState => storeState.boardModule.boards)
     const users = useSelector(storeState => storeState.userModule.users)
@@ -33,16 +34,24 @@ export function LoginSignup() {
         const field = ev.target.name
         const value = ev.target.value
         setCredentials({ ...credentials, [field]: value })
+        if (errorMsg) setErrorMsg('')
     }
 
-    function onSubmit(ev, isSignup) {
+    async function onSubmit(ev, isSignup) {
         ev.preventDefault()
         if (!credentials.username || !credentials.password) return
-        if(isSignup) {
-            if(!credentials.fullname) return 
-            signup(credentials)
-        } else login(credentials)
-        navigate(`/board/${boards[0]._id}`)
+        try {
+            if (isSignup) {
+                if (!credentials.fullname) return
+                await signup(credentials)
+            } else {
+                await login(credentials)
+            }
+            const boardId = boards[0]?._id
+            navigate(boardId ? `/board/${boardId}` : '/board')
+        } catch (err) {
+            setErrorMsg(isSignup ? 'Sign up failed. Username may already be taken.' : 'Incorrect username or password.')
+        }
     }
 
     function toggleSignup() {
@@ -123,6 +132,7 @@ export function LoginSignup() {
                         required
                     />
                 }
+                {errorMsg && <p className="login-error">{errorMsg}</p>}
                 <button className="btn-next">{isSignup ? 'Sign up' : 'Log in'}</button>
                 <div className="flex justify-center align-center split-line">
                     <span className="separator-line"></span>
