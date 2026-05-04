@@ -2,11 +2,12 @@ import axios from 'axios'
 import { useState, useEffect } from 'react'
 import { ImgUploader } from '../cmps/login/img-uploader'
 import { LoginPageHeader } from '../cmps/login/login-page-header'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { loadUsers, login, signup } from '../store/user.actions'
 import { loadBoards } from '../store/board.actions'
 import { useGoogleLogin } from '@react-oauth/google'
+import { Loader } from '../cmps/loader'
 
 export function LoginSignup() {
     const [credentials, setCredentials] = useState({ username: '', password: '', fullname: '' })
@@ -16,6 +17,8 @@ export function LoginSignup() {
     const navigate = useNavigate()
     const boards = useSelector(storeState => storeState.boardModule.boards)
     const users = useSelector(storeState => storeState.userModule.users)
+    const user = useSelector(s => s.userModule.user)
+    const isLoadingUser = useSelector(s => s.userModule.isLoadingUser)
 
     const googleLogin = useGoogleLogin({
         onSuccess: codeResponse => {
@@ -92,10 +95,13 @@ export function LoginSignup() {
         navigate(`/board/${boards[0]._id}`)
     }
 
+    if (isLoadingUser) return <Loader />
+    if (user) return <Navigate to={boards[0]?._id ? `/board/${boards[0]._id}` : '/'} replace />
+
     return (
         // TODO: Change header to the original header(option)
         // TODO: Change label to p
-        // TODO: fix image uplouder 
+        // TODO: fix image uplouder
         <div className="login-signup">
             <LoginPageHeader />
             <form className="form-container layout" onSubmit={(ev) => onSubmit(ev, isSignup)}>

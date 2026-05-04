@@ -1,23 +1,42 @@
-import React from 'react'
-import { Routes, Route } from 'react-router'
+import React, { useEffect } from 'react'
+import { Routes, Route, Navigate } from 'react-router'
 import { Provider } from 'react-redux'
+import { useSelector } from 'react-redux'
 import { BoardDetails } from './pages/board-details'
-import  HomePage from './pages/home-page'
+import HomePage from './pages/home-page'
 import { LoginSignup } from './pages/login-signup'
+import { MemberSummary } from './pages/member-summary'
 import { store } from './store/store'
+import { initUser } from './store/user.actions'
+import { Loader } from './cmps/loader'
+
+function AppInit() {
+    useEffect(() => { initUser() }, [])
+    return null
+}
+
+function RequireAuth({ children }) {
+    const user = useSelector(s => s.userModule.user)
+    const isLoadingUser = useSelector(s => s.userModule.isLoadingUser)
+    if (isLoadingUser) return <Loader />
+    if (!user) return <Navigate to="/auth/login" replace />
+    return children
+}
 
 export function RootCmp () {
     return (
         <Provider store={store}>
+            <AppInit />
             <div>
                 <main>
                     <Routes>
                         <Route element={<HomePage />} path='/' />
-                        <Route element={<BoardDetails />} path='/board/:boardId/' />
-                                <Route element={<BoardDetails />} path='/board/:boardId/:groupId/:taskId' />
-                                <Route element={<BoardDetails />} path='/board/:boardId/:activityLog' />
-                                <Route element={<LoginSignup />} path='/auth/login' />
-                            <Route element={<LoginSignup />} path='/auth/signup' />
+                        <Route element={<RequireAuth><BoardDetails /></RequireAuth>} path='/board/:boardId/' />
+                        <Route element={<RequireAuth><BoardDetails /></RequireAuth>} path='/board/:boardId/:groupId/:taskId' />
+                        <Route element={<RequireAuth><BoardDetails /></RequireAuth>} path='/board/:boardId/:activityLog' />
+                        <Route element={<LoginSignup />} path='/auth/login' />
+                        <Route element={<LoginSignup />} path='/auth/signup' />
+                        <Route element={<RequireAuth><MemberSummary /></RequireAuth>} path='/member/:memberId' />
                     </Routes>
                 </main>
             </div>

@@ -8,6 +8,7 @@ export const boardService = {
     query,
     getById,
     getFilteredBoard,
+    getMemberTasksFromBoards,
     save,
     remove,
     getDefaultFilterBoard,
@@ -25,6 +26,27 @@ export const boardService = {
 function query(filter = getDefaultFilterBoards()) {
     const queryParams = `?title=${filter.title}&isStarred=${filter.isStarred}`
     return httpService.get(BASE_URL + queryParams)
+}
+
+function getMemberTasksFromBoards(boards, memberId) {
+    const tasks = []
+    boards.forEach(board => {
+        board.groups?.forEach(group => {
+            group.tasks?.forEach(task => {
+                if (task.memberIds?.includes(memberId)) {
+                    tasks.push({
+                        ...task,
+                        boardId: board._id,
+                        boardTitle: board.title,
+                        groupId: group.id,
+                        groupTitle: group.title,
+                        groupColor: group.color,
+                    })
+                }
+            })
+        })
+    })
+    return tasks
 }
 
 function getFilteredBoard(board, filterBy = getDefaultFilterBoard()) {

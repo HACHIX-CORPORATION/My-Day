@@ -10,6 +10,7 @@ export const userService = {
     logout,
     signup,
     getLoggedinUser,
+    fetchLoggedinUser,
     saveLocalUser,
     getUsers,
     getById,
@@ -64,6 +65,10 @@ function saveLocalUser(user) {
 
 function getLoggedinUser() {
     return JSON.parse(sessionStorage.getItem(STORAGE_KEY_LOGGEDIN_USER))
+}
+
+async function fetchLoggedinUser() {
+    return httpService.get('auth/loggedin')
 }
 
 

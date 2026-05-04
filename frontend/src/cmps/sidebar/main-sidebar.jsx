@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { AiOutlineStar, AiOutlineMenu } from 'react-icons/ai'
 import { VscTriangleLeft } from 'react-icons/vsc'
+import { MdOutlineChecklist } from 'react-icons/md'
 import { closeDynamicModal } from '../../store/board.actions'
 import WorkspaceIcon from './workspace-icon'
 import { Tooltip } from '@mui/material'
@@ -43,6 +44,13 @@ export function MainSidebar ({ setIsLoginModalOpen, setWorkspaceDisplay, setIsWo
                         {display === 'starred' && <VscTriangleLeft className="triangle-icon" />}
                     </div>
                 </Tooltip>
+                {user && user._id && (
+                    <Tooltip title="My Tasks" arrow>
+                        <Link to={`/member/${user._id}`} className='icon-container'>
+                            <MdOutlineChecklist />
+                        </Link>
+                    </Tooltip>
+                )}
             </div>
             <div className='bottom'>
                 <Tooltip title="Login & Logout" arrow>

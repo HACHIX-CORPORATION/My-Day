@@ -7,14 +7,15 @@ export const SET_USERS = 'SET_USERS'
 
 const initialState = {
     user: userService.getLoggedinUser(),
-    users: []
+    users: [],
+    isLoadingUser: true
 }
 
 export function userReducer(state = initialState, action = {}) {
     var newState = state
     switch (action.type) {
         case SET_USER:
-            newState = { ...state, user: action.user }
+            newState = { ...state, user: action.user, isLoadingUser: false }
             break
         case SET_WATCHED_USER:
             newState = { ...state, watchedUser: action.user }

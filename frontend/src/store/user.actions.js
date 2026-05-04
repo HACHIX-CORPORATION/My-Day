@@ -78,3 +78,14 @@ export async function loadUser(userId) {
         console.log('Cannot load user', err)
     }
 }
+
+export async function initUser() {
+    try {
+        const user = await userService.fetchLoggedinUser()
+        if (user) userService.saveLocalUser(user)
+        else sessionStorage.removeItem('loggedinUser')
+        store.dispatch({ type: SET_USER, user: user || null })
+    } catch (err) {
+        store.dispatch({ type: SET_USER, user: null })
+    }
+}

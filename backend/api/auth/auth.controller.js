@@ -47,8 +47,14 @@ async function logout(req, res){
     }
 }
 
+async function getLoggedinUser(req, res) {
+    const loggedinUser = authService.validateToken(req.cookies.loginToken)
+    res.json(loggedinUser || null)
+}
+
 module.exports = {
     login,
     signup,
-    logout
+    logout,
+    getLoggedinUser
 }
