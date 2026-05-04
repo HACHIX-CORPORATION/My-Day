@@ -38,6 +38,7 @@ function getMemberTasksFromBoards(boards, memberId) {
                         ...task,
                         boardId: board._id,
                         boardTitle: board.title,
+                        boardLabels: board.labels,
                         groupId: group.id,
                         groupTitle: group.title,
                         groupColor: group.color,

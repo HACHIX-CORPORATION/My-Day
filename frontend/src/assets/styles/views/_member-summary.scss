@@ -1,3 +1,10 @@
+// Board task row uses .picker defined inside .task-preview — redeclare here
+.member-summary-main .picker {
+    min-width: $cell-width;
+    height: $cell-height;
+    border: 1px solid darken($border-color, 20%);
+}
+
 .member-summary-main {
     padding: $spacing-large $spacing-xl;
     background-color: $app-bg;
@@ -33,7 +40,7 @@
     .task-section {
         .task-section-header {
             gap: $spacing-small;
-            margin-bottom: $spacing-medium;
+            margin-bottom: $spacing-small;
             padding-bottom: $spacing-small;
             border-bottom: 2px solid $layout-border-color;
 
@@ -42,6 +49,8 @@
                 color: $color-egg_yolk;
                 display: flex;
                 align-items: center;
+
+                &.done-icon { color: $color-done-green; }
             }
 
             .task-section-title {
@@ -60,6 +69,43 @@
             }
         }
 
+        // Column header row — mirrors board .title cells
+        .summary-col-headers {
+            .summary-col-title {
+                display: flex;
+                align-items: center;
+                // sticky-div = 6px border-left + 24px drag handle + $cell-width-task title
+                min-width: calc(#{$cell-width-task} + 30px);
+                height: $cell-height;
+                border: 1px solid darken($border-color, 20%);
+                font-size: rem(13px);
+                color: $workspace-icon-color;
+                padding-left: calc(#{$spacing-large} + 6px);
+            }
+
+            .summary-col-picker {
+                @include center-flex();
+                min-width: $cell-width;
+                height: $cell-height;
+                border: 1px solid darken($border-color, 20%);
+                border-left: none;
+                font-size: rem(13px);
+                color: $workspace-icon-color;
+            }
+
+            .summary-col-board {
+                flex-grow: 1;
+                display: flex;
+                align-items: center;
+                height: $cell-height;
+                border: 1px solid darken($border-color, 20%);
+                border-left: none;
+                font-size: rem(13px);
+                color: $workspace-icon-color;
+                padding-left: $spacing-medium;
+            }
+        }
+
         .no-tasks-msg {
             color: $gray-color;
             font-size: rem(14px);
@@ -73,84 +119,152 @@
         }
     }
 
+    // Task row — mirrors .task-preview layout
     .task-summary-row {
-        gap: $spacing-small;
-        padding: $spacing-small $spacing-medium;
-        border-radius: 4px;
-        border-bottom: 1px solid $border-color;
-        transition: background-color 0.2s;
+        position: relative;
+        font-size: rem(14px);
 
         &:hover {
-            background-color: $task-hover-color;
-
-            .toggle-today-btn {
-                opacity: 1;
-            }
+            .drag-handle { opacity: 1; }
+            .open-task-details { opacity: 1; }
+            .toggle-today-btn { opacity: 1; }
         }
 
-        .group-color-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            flex-shrink: 0;
+        // Mirrors .group-preview .sticky-div
+        .summary-sticky-div {
+            display: flex;
+            background-color: white;
+            border-left: 6px solid;
+            position: sticky;
+            z-index: 1;
+            left: 0;
         }
 
-        .task-summary-title {
-            flex: 1;
-            color: $primary-text-color;
-            text-decoration: none;
-            font-size: rem(14px);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-
-            &:hover {
-                color: $link-color;
-                text-decoration: underline;
-            }
-        }
-
-        .board-name-chip {
-            font-size: rem(12px);
-            color: $workspace-icon-color;
-            background-color: $workspace-hover;
-            border-radius: 12px;
-            padding: 2px 10px;
-            white-space: nowrap;
-        }
-
-        .due-date-badge {
-            font-size: rem(12px);
-            color: $workspace-icon-color;
-            white-space: nowrap;
-
-            &.due-today {
-                color: $board-btn;
-                font-weight: 600;
-            }
-        }
-
-        .toggle-today-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: $gray-color;
-            font-size: rem(16px);
-            padding: $spacing-xs;
-            border-radius: 4px;
+        // Replaces checkbox — white icon on gray bg
+        .drag-handle {
             display: flex;
             align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            width: 24px;
+            color: white;
+            background-color: $workspace-icon-color;
+            cursor: grab;
             opacity: 0;
-            transition: color 0.2s, background-color 0.2s, opacity 0.2s;
+            font-size: rem(20px);
+            transition: opacity 0.2s;
+            border-right: 1px solid darken($border-color, 20%);
 
-            &:hover {
-                color: $color-egg_yolk;
-                background-color: $workspace-hover;
+            &:active { cursor: grabbing; }
+        }
+
+        // Mirrors .task-preview .task-title
+        .task-title {
+            width: $cell-width-task;
+            cursor: default;
+
+            .summary-title-link {
+                flex: 1;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                margin-left: $spacing-medium;
+                color: $primary-text-color;
+                text-decoration: none;
+                font-size: rem(14px);
+
+                &:hover {
+                    color: $link-color;
+                    text-decoration: underline;
+                }
             }
 
-            &.active {
-                color: $color-egg_yolk;
-                opacity: 1;
+            .summary-right-actions {
+                display: flex;
+                align-items: center;
+            }
+
+            // Mirrors .task-preview .open-task-details
+            .open-task-details {
+                @include center-flex();
+                gap: 4px;
+                opacity: 0;
+                margin: 0 $spacing-small;
+                color: $workspace-icon-color;
+                text-decoration: none;
+                font-size: rem(12px);
+                transition: opacity 0.2s;
+                white-space: nowrap;
+
+                &:hover { color: $board-btn; }
+            }
+
+            .toggle-today-btn {
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: $gray-color;
+                font-size: rem(16px);
+                padding: $spacing-xs;
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                opacity: 0;
+                transition: color 0.2s, background-color 0.2s, opacity 0.2s;
+
+                &:hover {
+                    color: $color-egg_yolk;
+                    background-color: $workspace-hover;
+                }
+
+                &.active {
+                    color: $color-egg_yolk;
+                    opacity: 1;
+                }
+            }
+        }
+
+        // Dropdown for SummaryLabelPicker (rendered inside .status-priority-picker)
+        .summary-label-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 200;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+            list-style: none;
+            padding: 4px;
+            min-width: 140px;
+
+            li {
+                padding: 7px 12px;
+                border-radius: 3px;
+                color: white;
+                font-size: rem(13px);
+                cursor: pointer;
+                white-space: nowrap;
+
+                &:hover { filter: brightness(0.9); }
+            }
+        }
+
+        // Board name badge — replaces .empty-div at far right
+        .board-name-end {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            padding: 0 $spacing-medium;
+            border: 1px solid darken($border-color, 20%);
+            border-left: none;
+
+            .board-name-chip {
+                font-size: rem(12px);
+                color: $workspace-icon-color;
+                background-color: $workspace-hover;
+                border-radius: 12px;
+                padding: 2px 10px;
+                white-space: nowrap;
             }
         }
     }
