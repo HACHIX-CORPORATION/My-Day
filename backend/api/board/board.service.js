@@ -90,6 +90,16 @@ async function updateTask(boardId, groupId, taskId, saveTask){
             } catch { /* fall back to env default */ }
         }
 
+        // Auto-track actual time based on status transitions
+        if (newStatus === 'Progress' && oldStatus !== 'Progress') {
+            saveTask.progressStartedAt = Date.now()
+        }
+        if (oldStatus === 'Progress' && newStatus !== 'Progress') {
+            const elapsed = Math.round((Date.now() - (oldTask.progressStartedAt || Date.now())) / 60000)
+            saveTask.actualTime = (saveTask.actualTime || 0) + elapsed
+            saveTask.progressStartedAt = null
+        }
+
         // Handle Progress start synchronously so webexThreadId is written in the
         // same DB update — prevents the race condition where loadBoards() returns
         // before the separate _saveWebexThreadId write completes.
@@ -204,6 +214,29 @@ async function normalizeBoardLabels() {
     }
 }
 
+async function normalizeTimeCmps() {
+    try {
+        const collection = await dbService.getCollection('board')
+        const boards = await collection.find({}).toArray()
+        for (const board of boards) {
+            let dirty = false
+            if (!board.cmpsOption) board.cmpsOption = []
+            if (!board.cmpsOrder) board.cmpsOrder = []
+            for (const key of ['estimate-time', 'actual-time']) {
+                if (!board.cmpsOption.includes(key)) { board.cmpsOption.push(key); dirty = true }
+                if (!board.cmpsOrder.includes(key)) { board.cmpsOrder.push(key); dirty = true }
+            }
+            if (dirty) {
+                const { _id, ...boardToSave } = board
+                await collection.updateOne({ _id }, { $set: boardToSave })
+            }
+        }
+        logger.info('Board time columns migration complete')
+    } catch (err) {
+        logger.error('Board time columns migration failed', err)
+    }
+}
+
 module.exports = {
     remove,
     query,
@@ -212,5 +245,6 @@ module.exports = {
     update,
     updateTask,
     updateGroup,
-    normalizeBoardLabels
+    normalizeBoardLabels,
+    normalizeTimeCmps
 }

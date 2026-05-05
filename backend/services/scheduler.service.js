@@ -72,7 +72,6 @@ async function _runScheduledSend() {
 
         for (const setting of settings) {
             try {
-                if (setting.lastSentDate === todayStr) continue
                 if (!setting.workingDays?.includes(dayOfWeek)) continue
                 if (setting.restDays?.includes(todayStr)) continue
 
@@ -87,9 +86,21 @@ async function _runScheduledSend() {
 
                 const roomName = setting.webexRoomName || process.env.WEBEX_ROOM_NAME
                 const markdown = _formatMessage(tasks, todayStr)
-                await webexService.sendMessage(markdown, roomName, webexToken)
-                await collection.updateOne({ _id: setting._id }, { $set: { lastSentDate: todayStr } })
-                logger.info(`Webex digest sent for user ${setting.userId}`)
+                const alreadySentToday = setting.lastSentDate === todayStr && setting.lastMessageId
+
+                if (alreadySentToday) {
+                    try {
+                        await webexService.editMessage(setting.lastMessageId, markdown, roomName, webexToken)
+                        logger.info(`Webex digest edited for user ${setting.userId}, messageId=${setting.lastMessageId}`)
+                        continue
+                    } catch (editErr) {
+                        logger.warn(`Scheduled edit failed for user ${setting.userId}, msg ${setting.lastMessageId}: ${editErr.message}. Sending new.`)
+                    }
+                }
+
+                const msgData = await webexService.sendMessage(markdown, roomName, webexToken)
+                await collection.updateOne({ _id: setting._id }, { $set: { lastSentDate: todayStr, lastMessageId: msgData.id } })
+                logger.info(`Webex digest sent for user ${setting.userId}, messageId=${msgData.id}`)
             } catch (err) {
                 logger.error(`Failed to send Webex digest for user ${setting.userId}`, err)
             }

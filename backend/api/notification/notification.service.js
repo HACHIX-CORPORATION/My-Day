@@ -66,8 +66,28 @@ async function sendNow(userId) {
         if (tasks.length === 0) {
             return { sent: false, reason: 'No tasks in Today group' }
         }
+
         const markdown = _formatMessage(tasks, todayStr)
-        await webexService.sendMessage(markdown, roomName, webexToken)
+        const alreadySentToday = settings.lastSentDate === todayStr && settings.lastMessageId
+
+        if (alreadySentToday) {
+            try {
+                await webexService.editMessage(settings.lastMessageId, markdown, roomName, webexToken)
+                logger.info(`[sendNow] edited existing message ${settings.lastMessageId} for user ${userId}`)
+                return { sent: true, count: tasks.length }
+            } catch (editErr) {
+                logger.warn(`[sendNow] edit failed for message ${settings.lastMessageId}, falling back to new: ${editErr.message}`)
+            }
+        }
+
+        const msgData = await webexService.sendMessage(markdown, roomName, webexToken)
+        const collection = await dbService.getCollection('notificationSettings')
+        await collection.updateOne(
+            { userId },
+            { $set: { lastSentDate: todayStr, lastMessageId: msgData.id } },
+            { upsert: true }
+        )
+        logger.info(`[sendNow] new message sent, id=${msgData.id} for user ${userId}`)
         return { sent: true, count: tasks.length }
     } catch (err) {
         logger.error(`Failed to send Webex message now for user ${userId}`, err)

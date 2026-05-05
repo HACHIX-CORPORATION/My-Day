@@ -1,0 +1,44 @@
+.time-picker {
+    max-width: 140px;
+    @include center-flex();
+    position: relative;
+    font-size: rem(14px);
+    cursor: pointer;
+    gap: $spacing-xs;
+
+    &:hover .time-display {
+        color: $primary-text-color;
+    }
+
+    .time-display {
+        color: $workspace-icon-color;
+        white-space: nowrap;
+    }
+
+    .time-picker-input {
+        width: 90%;
+        outline: none;
+        border: 0.2px solid $board-btn;
+        border-radius: 3px;
+        text-align: center;
+        font-size: rem(13px);
+        height: 70%;
+        padding: 0 4px;
+        background: white;
+    }
+
+    // Pulsing green dot shown when task is actively in Progress
+    .live-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background-color: $color-done-green;
+        flex-shrink: 0;
+        animation: live-pulse 1.8s ease-in-out infinite;
+    }
+}
+
+@keyframes live-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.75); }
+}

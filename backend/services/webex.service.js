@@ -72,4 +72,21 @@ async function sendThreadReply(parentId, markdown, roomName, token) {
     }
 }
 
-module.exports = { sendMessage, sendThreadReply }
+async function editMessage(messageId, markdown, roomName, token) {
+    const effectiveRoom = roomName || process.env.WEBEX_ROOM_NAME || 'DailyReport'
+    const roomId = await _resolveRoomId(effectiveRoom, token)
+    try {
+        const res = await axios.put(
+            `${WEBEX_API}/messages/${messageId}`,
+            { roomId, markdown },
+            { headers: _headers(token) }
+        )
+        return res.data
+    } catch (err) {
+        const status = err.response?.status
+        const msg = err.response?.data?.message || err.message
+        throw new Error(`Webex edit failed (${status}): ${msg}`)
+    }
+}
+
+module.exports = { sendMessage, sendThreadReply, editMessage }

@@ -10,6 +10,7 @@ import { setDynamicModalObj, toggleModal, updateTaskAction } from "../../store/b
 import { UpdatedPicker } from "./updated-picker"
 import { NumberPicker } from "./number-picker"
 import { FilePicker } from "./file-picker"
+import { EstimateTimePicker, ActualTimePicker } from "./time-picker"
 
 import { TbArrowsDiagonal } from 'react-icons/tb'
 import { BiDotsHorizontalRounded, BiMessageRoundedAdd } from 'react-icons/bi'
@@ -33,6 +34,11 @@ export function TaskPreview({ task, group, board, handleCheckboxChange, isMainCh
     async function updateTask(cmpType, data, activity) {
         const taskToUpdate = structuredClone(task)
         taskToUpdate[cmpType] = data
+        // When manually overriding actual time while the task is running, reset the
+        // timer baseline so the live counter starts fresh from the new value.
+        if (cmpType === 'actualTime' && taskToUpdate.status === 'Progress') {
+            taskToUpdate.progressStartedAt = Date.now()
+        }
         taskToUpdate.updatedBy.date = Date.now()
         taskToUpdate.updatedBy.imgUrl = (user && user.imgUrl) || guest
         try {
@@ -127,10 +133,14 @@ function DynamicCmp({ cmp, info, onUpdate }) {
             return <PriorityPicker info={info} onUpdate={onUpdate} />
         case "number-picker":
             return <NumberPicker info={info} onUpdate={onUpdate} />
-        case "file-picker": 
+        case "file-picker":
             return <FilePicker info={info} onUpdate={onUpdate} />
         case "updated-picker":
             return <UpdatedPicker info={info} onUpdate={onUpdate} />
+        case "estimate-time":
+            return <EstimateTimePicker info={info} onUpdate={onUpdate} />
+        case "actual-time":
+            return <ActualTimePicker info={info} onUpdate={onUpdate} />
         default:
             return <p>UNKNOWN {cmp}</p>
     }

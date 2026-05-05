@@ -16,6 +16,7 @@ import { LoginLogoutModal } from '../cmps/modal/login-logout-modal'
 import { CreateBoard } from '../cmps/modal/create-board'
 import { Loader } from '../cmps/loader'
 import { DueDate } from '../cmps/task/date-picker'
+import { EstimateTimePicker, ActualTimePicker } from '../cmps/task/time-picker'
 
 import { BsSun, BsCheckCircle } from 'react-icons/bs'
 import { MdDragIndicator } from 'react-icons/md'
@@ -92,6 +93,10 @@ function TaskSummaryRow({ task, onToggleToday, onUpdateField, dragHandleProps })
         onUpdateField(task, field, val)
     }
 
+    function onTimeUpdate(field, val) {
+        onUpdateField(task, field, val)
+    }
+
     return (
         <section className="task-summary-row flex">
             <div className="summary-sticky-div" style={{ borderColor: task.groupColor }}>
@@ -122,6 +127,8 @@ function TaskSummaryRow({ task, onToggleToday, onUpdateField, dragHandleProps })
             <SummaryLabelPicker task={task} field="status" onUpdate={onUpdateField} />
             <DueDate info={task} onUpdate={onDateUpdate} />
             <SummaryLabelPicker task={task} field="priority" onUpdate={onUpdateField} />
+            <EstimateTimePicker info={task} onUpdate={onTimeUpdate} />
+            <ActualTimePicker info={task} onUpdate={onTimeUpdate} />
             <div className="board-name-end">
                 <span className="board-name-chip">{task.boardTitle}</span>
             </div>
@@ -174,6 +181,8 @@ function TaskSection({ sectionId, title, tasks, onToggleToday, onUpdateField, ic
                 <div className="summary-col-picker">Status</div>
                 <div className="summary-col-picker">Date</div>
                 <div className="summary-col-picker">Priority</div>
+                <div className="summary-col-picker">Est.</div>
+                <div className="summary-col-picker">Actual</div>
                 <div className="summary-col-board">Board</div>
             </div>
             {isStatic ? (
@@ -468,6 +477,9 @@ export function MemberSummary() {
     async function _doUpdateField(enrichedTask, field, value) {
         const { boardId, boardTitle, groupId, groupTitle, groupColor, boardLabels, ...taskToSave } = enrichedTask
         taskToSave[field] = value
+        if (field === 'actualTime' && taskToSave.status === 'Progress') {
+            taskToSave.progressStartedAt = Date.now()
+        }
         await boardService.updateTask(boardId, groupId, taskToSave)
         await loadBoards()
     }
@@ -543,7 +555,6 @@ export function MemberSummary() {
                     {user?.imgUrl && (
                         <img className="member-avatar" src={user.imgUrl} alt={user.fullname} />
                     )}
-                    <h1 className="member-summary-title">My Tasks</h1>
                 </header>
                 <DragDropContext onDragEnd={onDragEnd}>
                     <div className="task-sections">

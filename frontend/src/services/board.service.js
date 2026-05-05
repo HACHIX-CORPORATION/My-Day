@@ -133,6 +133,9 @@ function getEmptyTask() {
             "imgUrl":"",
         },
         "file": "",
+        "estimateTime": 0,
+        "actualTime": 0,
+        "progressStartedAt": null,
     }
 }
 
@@ -215,9 +218,9 @@ function getEmptyBoard() {
         ],
         "groups": [],
         "activities": [],
-        "cmpsOrder": ["status-picker", "member-picker", "date-picker", 'priority-picker', 'updated-picker'],
+        "cmpsOrder": ["status-picker", "member-picker", "date-picker", 'priority-picker', 'updated-picker', 'estimate-time', 'actual-time'],
         "description": "",
-        "cmpsOption": ["status-picker", "member-picker", "date-picker", 'priority-picker', 'number-picker', 'file-picker', 'updated-picker']
+        "cmpsOption": ["status-picker", "member-picker", "date-picker", 'priority-picker', 'number-picker', 'file-picker', 'updated-picker', 'estimate-time', 'actual-time']
     }
 }
 
