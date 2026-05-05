@@ -158,20 +158,49 @@ async function updateGroup(boardId, groupId, saveGroup){
     }
 }
 
-async function addPauseLabelToBoards() {
+async function normalizeBoardLabels() {
     try {
         const collection = await dbService.getCollection('board')
         const boards = await collection.find({}).toArray()
         for (const board of boards) {
-            if (board.labels && !board.labels.some(l => l.title === 'Pause')) {
-                board.labels.push({ id: 'l108', title: 'Pause', color: '#579bfc' })
+            let dirty = false
+
+            if (board.labels) {
+                const STATUS_IDS = new Set(['l101', 'l102', 'l103', 'l108'])
+                const PRIORITY_IDS = new Set(['l104', 'l105', 'l106'])
+                for (const label of board.labels) {
+                    if (label.title.toLowerCase() === 'stack') {
+                        label.title = 'Stuck'
+                        dirty = true
+                    }
+                    if (!label.type) {
+                        if (STATUS_IDS.has(label.id)) { label.type = 'status'; dirty = true }
+                        else if (PRIORITY_IDS.has(label.id)) { label.type = 'priority'; dirty = true }
+                    }
+                }
+                if (!board.labels.some(l => l.title === 'Pause')) {
+                    board.labels.push({ id: 'l108', title: 'Pause', color: '#579bfc', type: 'status' })
+                    dirty = true
+                }
+            }
+
+            for (const group of (board.groups || [])) {
+                for (const task of (group.tasks || [])) {
+                    if (task.status && task.status.toLowerCase() === 'stack') {
+                        task.status = 'Stuck'
+                        dirty = true
+                    }
+                }
+            }
+
+            if (dirty) {
                 const { _id, ...boardToSave } = board
                 await collection.updateOne({ _id }, { $set: boardToSave })
             }
         }
-        logger.info('Pause label migration complete')
+        logger.info('Board labels migration complete')
     } catch (err) {
-        logger.error('Pause label migration failed', err)
+        logger.error('Board labels migration failed', err)
     }
 }
 
@@ -183,5 +212,5 @@ module.exports = {
     update,
     updateTask,
     updateGroup,
-    addPauseLabelToBoards
+    normalizeBoardLabels
 }

@@ -73,7 +73,7 @@ function SummaryLabelPicker({ task, field, onUpdate }) {
             <span className="fold"></span>
             {open && (
                 <ul className="summary-label-dropdown" onClick={e => e.stopPropagation()}>
-                    {task.boardLabels?.map(l => (
+                    {task.boardLabels?.filter(l => !l.type || l.type === field).map(l => (
                         <li key={l.id} style={{ backgroundColor: l.color }}
                             onClick={e => onSelect(e, l.title)}>
                             {l.title}

@@ -182,46 +182,14 @@ function getEmptyBoard() {
             "_id": utilService.makeId()
         },
         "labels": [
-            {
-                "id": "l101",
-                "title": "Done",
-                "color": "#00c875"
-            },
-            {
-                "id": "l102",
-                "title": "Progress",
-                "color": "#fdab3d"
-            },
-            {
-                "id": "l103",
-                "title": "Stuck",
-                "color": "#e2445c"
-            },
-            {
-                "id": "l108",
-                "title": "Pause",
-                "color": "#579bfc"
-            },
-            {
-                "id": "l104",
-                "title": "Low",
-                "color": "#ffcb00"
-            },
-            {
-                "id": "l105",
-                "title": "Medium",
-                "color": "#a25ddc"
-            },
-            {
-                "id": "l106",
-                "title": "High",
-                "color": "#e2445c"
-            },
-            {
-                "id": "l107",
-                "title": "",
-                "color": "#c4c4c4"
-            },
+            { "id": "l101", "title": "Done",     "color": "#00c875", "type": "status" },
+            { "id": "l102", "title": "Progress", "color": "#fdab3d", "type": "status" },
+            { "id": "l103", "title": "Stuck",    "color": "#e2445c", "type": "status" },
+            { "id": "l108", "title": "Pause",    "color": "#579bfc", "type": "status" },
+            { "id": "l104", "title": "Low",      "color": "#ffcb00", "type": "priority" },
+            { "id": "l105", "title": "Medium",   "color": "#a25ddc", "type": "priority" },
+            { "id": "l106", "title": "High",     "color": "#e2445c", "type": "priority" },
+            { "id": "l107", "title": "",         "color": "#c4c4c4" },
         ],
         "members": [
             {
