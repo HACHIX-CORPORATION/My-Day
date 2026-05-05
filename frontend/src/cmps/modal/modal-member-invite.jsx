@@ -19,7 +19,7 @@ export function ModalMemberInvite({ board, setIsInviteModalOpen }) {
 
     useEffect(() => {
         setOutBoardMembers(users.filter(user => !board.members.some(member => member._id === user._id)))
-    }, [users])
+    }, [users, board])
 
     async function onRemoveMember(removeMemberId) {
         try {

@@ -4,7 +4,7 @@ const config = require('../config')
 const asyncLocalStorage = require('../services/als.service')
 
 function requireAuth(req, res, next) {
-  const { loggedinUser } = asyncLocalStorage.getStore()
+  const loggedinUser = asyncLocalStorage.getStore()?.loggedinUser
 
   if (config.isGuestMode && !loggedinUser) {
     req.loggedinUser = { _id: '', fullname: 'Guest' }
@@ -15,7 +15,7 @@ function requireAuth(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  const { loggedinUser } = asyncLocalStorage.getStore()
+  const loggedinUser = asyncLocalStorage.getStore()?.loggedinUser
   if (!loggedinUser) return res.status(401).send('Not Authenticated')
   if (!loggedinUser.isAdmin) {
     logger.warn(loggedinUser.fullname + 'attempted to perform admin action')
