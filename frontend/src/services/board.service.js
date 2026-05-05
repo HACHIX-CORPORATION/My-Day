@@ -198,6 +198,11 @@ function getEmptyBoard() {
                 "color": "#e2445c"
             },
             {
+                "id": "l108",
+                "title": "Pause",
+                "color": "#579bfc"
+            },
+            {
                 "id": "l104",
                 "title": "Low",
                 "color": "#ffcb00"

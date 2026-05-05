@@ -6,6 +6,7 @@ module.exports = {
     query,
     getById,
     getByUsername,
+    getWebexToken,
     remove,
     update,
     add
@@ -18,6 +19,7 @@ async function query(filterBy = {}) {
         var users = await collection.find(criteria).toArray()
         users = users.map(user => {
             delete user.password
+            delete user.webexToken
             user.createdAt = ObjectId(user._id).getTimestamp()
             return user
         })
@@ -34,10 +36,22 @@ async function getById(userId) {
         const collection = await dbService.getCollection('user')
         const user = await collection.findOne({ _id: ObjectId(userId) })
         delete user.password
+        delete user.webexToken
         return user
     } catch (err) {
         logger.error(`while finding user by id: ${userId}`, err)
         throw err
+    }
+}
+
+async function getWebexToken(userId) {
+    try {
+        const collection = await dbService.getCollection('user')
+        const user = await collection.findOne({ _id: ObjectId(userId) }, { projection: { webexToken: 1 } })
+        return user?.webexToken || null
+    } catch (err) {
+        logger.error(`while getting webexToken for user: ${userId}`, err)
+        return null
     }
 }
 async function getByUsername(username) {
@@ -64,15 +78,17 @@ async function remove(userId) {
 async function update(user) {
     try {
         const userToSave = {
-            _id: ObjectId(user._id), 
+            _id: ObjectId(user._id),
             fullname: user.fullname,
             username: user.username,
             password: user.password,
             imgUrl: user.imgUrl,
         }
+        if (user.webexToken !== undefined) userToSave.webexToken = user.webexToken
         const collection = await dbService.getCollection('user')
         await collection.updateOne({ _id: userToSave._id }, { $set: userToSave })
         delete userToSave.password
+        delete userToSave.webexToken
         return userToSave
     } catch (err) {
         logger.error(`cannot update user ${user._id}`, err)

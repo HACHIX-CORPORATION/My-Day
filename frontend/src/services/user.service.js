@@ -16,6 +16,7 @@ export const userService = {
     getById,
     remove,
     update,
+    updateUser,
 }
 
 window.userService = userService
@@ -35,6 +36,10 @@ function remove(userId) {
 async function update({user}) {
     if (user._id) return httpService.put(BASE_URL + user._id, user)
     return httpService.post(BASE_URL, user)
+}
+
+async function updateUser(user) {
+    return httpService.put(BASE_URL + user._id, user)
 }
 
 async function login(userCred) {

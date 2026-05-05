@@ -1,6 +1,11 @@
 const dbService = require('../../services/db.service')
 const logger = require('../../services/logger.service')
 const ObjectId = require('mongodb').ObjectId
+const webexService = require('../../services/webex.service')
+const asyncLocalStorage = require('../../services/als.service')
+const userService = require('../user/user.service')
+
+const REALTIME_ROOM = process.env.WEBEX_REALTIME_ROOM_NAME || 'RealTimeReport'
 
 async function query(filterBy) {
     try {
@@ -64,14 +69,80 @@ async function update(board) {
 
 async function updateTask(boardId, groupId, taskId, saveTask){
     try {
-        const board =  await getById(boardId)
+        const board = await getById(boardId)
         const group = board.groups.find(group => group.id === groupId)
+
+        const oldTask = group.tasks.find(t => t.id === taskId)
+        const oldStatus = oldTask?.status || ''
+        const newStatus = saveTask.status || ''
+        const existingThreadId = oldTask?.webexThreadId
+        const store = asyncLocalStorage.getStore()
+        const who = store?.loggedinUser?.fullname || 'Someone'
+        const actorId = store?.loggedinUser?._id
+        const webexToken = actorId ? await userService.getWebexToken(actorId) : null
+
+        let realtimeRoom = REALTIME_ROOM
+        if (webexToken && actorId) {
+            try {
+                const settingsCol = await dbService.getCollection('notificationSettings')
+                const userSettings = await settingsCol.findOne({ userId: actorId })
+                if (userSettings?.webexRealtimeRoomName) realtimeRoom = userSettings.webexRealtimeRoomName
+            } catch { /* fall back to env default */ }
+        }
+
+        // Handle Progress start synchronously so webexThreadId is written in the
+        // same DB update — prevents the race condition where loadBoards() returns
+        // before the separate _saveWebexThreadId write completes.
+        if (webexToken && newStatus === 'Progress' && oldStatus !== 'Progress') {
+            if (oldStatus === 'Pause' && existingThreadId) {
+                try {
+                    await webexService.sendThreadReply(existingThreadId, `▶️ Resumed by **${who}**`, realtimeRoom, webexToken)
+                    saveTask.webexThreadId = existingThreadId
+                } catch {
+                    const msg = await webexService.sendMessage(
+                        `## 🚀 In Progress\n**${saveTask.title}** — started by **${who}**\nBoard: ${board.title} | Group: ${group.title}`,
+                        realtimeRoom,
+                        webexToken
+                    )
+                    saveTask.webexThreadId = msg.id
+                }
+            } else {
+                const msg = await webexService.sendMessage(
+                    `## 🚀 In Progress\n**${saveTask.title}** — started by **${who}**\nBoard: ${board.title} | Group: ${group.title}`,
+                    realtimeRoom,
+                    webexToken
+                )
+                saveTask.webexThreadId = msg.id
+            }
+        }
+
         group.tasks = group.tasks.map(task => (task.id === taskId) ? saveTask : task)
         await update(board)
+
+        // Pause and Done replies don't need a DB write — fire-and-forget is fine
+        if (webexToken) {
+            _handleStopDoneNotification(oldStatus, newStatus, existingThreadId, who, webexToken, realtimeRoom)
+                .catch(err => logger.error('WebEx notification failed', err))
+        }
+
         return board
     } catch (err) {
         logger.error(`cannot update task ${taskId}`, err)
         throw err
+    }
+}
+
+async function _handleStopDoneNotification(oldStatus, newStatus, threadId, who, webexToken, realtimeRoom) {
+    if (oldStatus === 'Progress' && newStatus !== 'Progress' && newStatus !== 'Done') {
+        if (threadId) {
+            await webexService.sendThreadReply(threadId, `⏸️ Paused by **${who}**`, realtimeRoom, webexToken)
+        }
+    }
+
+    if (newStatus === 'Done' && oldStatus !== 'Done') {
+        if (threadId) {
+            await webexService.sendThreadReply(threadId, `✅ Completed by **${who}**`, realtimeRoom, webexToken)
+        }
     }
 }
 
@@ -87,6 +158,23 @@ async function updateGroup(boardId, groupId, saveGroup){
     }
 }
 
+async function addPauseLabelToBoards() {
+    try {
+        const collection = await dbService.getCollection('board')
+        const boards = await collection.find({}).toArray()
+        for (const board of boards) {
+            if (board.labels && !board.labels.some(l => l.title === 'Pause')) {
+                board.labels.push({ id: 'l108', title: 'Pause', color: '#579bfc' })
+                const { _id, ...boardToSave } = board
+                await collection.updateOne({ _id }, { $set: boardToSave })
+            }
+        }
+        logger.info('Pause label migration complete')
+    } catch (err) {
+        logger.error('Pause label migration failed', err)
+    }
+}
+
 module.exports = {
     remove,
     query,
@@ -94,5 +182,6 @@ module.exports = {
     add,
     update,
     updateTask,
-    updateGroup
+    updateGroup,
+    addPauseLabelToBoards
 }

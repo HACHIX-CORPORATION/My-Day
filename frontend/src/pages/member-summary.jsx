@@ -2,10 +2,13 @@ import { useEffect, useState, useMemo } from 'react'
 import { useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
+import DatePicker from 'react-datepicker'
 
 import { loadBoards } from '../store/board.actions'
 import { loadUsers } from '../store/user.actions'
 import { boardService } from '../services/board.service'
+import { notificationService } from '../services/notification.service'
+import { userService } from '../services/user.service'
 
 import { MainSidebar } from '../cmps/sidebar/main-sidebar'
 import { WorkspaceSidebar } from '../cmps/sidebar/workspace-sidebar'
@@ -17,6 +20,7 @@ import { DueDate } from '../cmps/task/date-picker'
 import { BsSun, BsCheckCircle } from 'react-icons/bs'
 import { MdDragIndicator } from 'react-icons/md'
 import { TbArrowsDiagonal } from 'react-icons/tb'
+import { MdSend, MdExpandMore, MdExpandLess } from 'react-icons/md'
 
 function isTaskToday(task) {
     if (task.isToday) return true
@@ -26,6 +30,24 @@ function isTaskToday(task) {
         return due.toDateString() === today.toDateString()
     }
     return false
+}
+
+function ProgressConflictModal({ currentTask, pendingTask, onConfirm, onCancel }) {
+    return (
+        <div className="progress-conflict-overlay" onClick={onCancel}>
+            <div className="progress-conflict-modal" onClick={e => e.stopPropagation()}>
+                <h3>Task Already In Progress</h3>
+                <p>
+                    <strong>{currentTask.title}</strong> is currently in progress.
+                    Stop it and start <strong>{pendingTask.title}</strong>?
+                </p>
+                <div className="progress-conflict-actions">
+                    <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+                    <button className="btn-primary" onClick={onConfirm}>Stop &amp; Start</button>
+                </div>
+            </div>
+        </div>
+    )
 }
 
 function SummaryLabelPicker({ task, field, onUpdate }) {
@@ -107,13 +129,45 @@ function TaskSummaryRow({ task, onToggleToday, onUpdateField, dragHandleProps })
     )
 }
 
-function TaskSection({ sectionId, title, tasks, onToggleToday, onUpdateField, icon, iconClass, isStatic }) {
+function TaskSection({ sectionId, title, tasks, onToggleToday, onUpdateField, icon, iconClass, isStatic, onSendNow }) {
+    const [sendStatus, setSendStatus] = useState(null)
+
+    async function handleSendNow() {
+        if (!onSendNow) return
+        setSendStatus('sending')
+        try {
+            const result = await onSendNow()
+            if (result?.error) setSendStatus('error')
+            else setSendStatus(result?.sent === false ? 'empty' : 'sent')
+        } catch {
+            setSendStatus('error')
+        }
+        setTimeout(() => setSendStatus(null), 3000)
+    }
+
     return (
         <section className="task-section">
             <div className="task-section-header flex align-center">
                 {icon && <span className={`section-icon${iconClass ? ` ${iconClass}` : ''}`}>{icon}</span>}
                 <h2 className="task-section-title">{title}</h2>
                 <span className="task-count">{tasks.length}</span>
+                {onSendNow && (
+                    <button
+                        className={`send-now-header-btn${sendStatus ? ` status-${sendStatus}` : ''}`}
+                        onClick={handleSendNow}
+                        disabled={sendStatus === 'sending'}
+                        title="Send today's tasks to Webex"
+                    >
+                        <MdSend />
+                        <span className="send-label">
+                            {sendStatus === 'sending' ? 'Sending…'
+                                : sendStatus === 'sent' ? 'Sent!'
+                                : sendStatus === 'empty' ? 'No tasks'
+                                : sendStatus === 'error' ? 'Failed'
+                                : 'Update'}
+                        </span>
+                    </button>
+                )}
             </div>
             <div className="summary-col-headers flex">
                 <div className="summary-col-title">Task</div>
@@ -174,6 +228,212 @@ function TaskSection({ sectionId, title, tasks, onToggleToday, onUpdateField, ic
     )
 }
 
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function WebexSettingsSection({ onSendNow, user }) {
+    const [isOpen, setIsOpen] = useState(false)
+    const [settings, setSettings] = useState({
+        sendTime: '08:00',
+        workingDays: [1, 2, 3, 4, 5],
+        restDays: [],
+        webexRoomName: 'DailyReport',
+        webexRealtimeRoomName: 'RealTimeReport',
+    })
+    const [webexToken, setWebexToken] = useState('')
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveMsg, setSaveMsg] = useState(null)
+    const [sendStatus, setSendStatus] = useState(null)
+    const [sendError, setSendError] = useState(null)
+
+    useEffect(() => {
+        notificationService.getSettings().then(s => {
+            if (s) setSettings({
+                sendTime: s.sendTime || '08:00',
+                workingDays: s.workingDays ?? [1, 2, 3, 4, 5],
+                restDays: s.restDays || [],
+                webexRoomName: s.webexRoomName || 'DailyReport',
+                webexRealtimeRoomName: s.webexRealtimeRoomName || 'RealTimeReport',
+            })
+        }).catch(() => {})
+    }, [])
+
+    function toggleDay(idx) {
+        setSettings(s => ({
+            ...s,
+            workingDays: s.workingDays.includes(idx)
+                ? s.workingDays.filter(d => d !== idx)
+                : [...s.workingDays, idx].sort(),
+        }))
+    }
+
+    function onRestDayPick(date) {
+        const str = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        setSettings(s => ({
+            ...s,
+            restDays: s.restDays.includes(str)
+                ? s.restDays.filter(d => d !== str)
+                : [...s.restDays, str].sort(),
+        }))
+    }
+
+    function removeRestDay(str) {
+        setSettings(s => ({ ...s, restDays: s.restDays.filter(d => d !== str) }))
+    }
+
+    async function onSave() {
+        setIsSaving(true)
+        try {
+            await notificationService.saveSettings(settings)
+            if (webexToken && user?._id) {
+                await userService.updateUser({ _id: user._id, webexToken })
+                setWebexToken('')
+            }
+            setSaveMsg({ type: 'success', text: 'Settings saved!' })
+        } catch {
+            setSaveMsg({ type: 'error', text: 'Failed to save settings' })
+        } finally {
+            setIsSaving(false)
+            setTimeout(() => setSaveMsg(null), 3000)
+        }
+    }
+
+    async function handleSendNow() {
+        setSendStatus('sending')
+        setSendError(null)
+        try {
+            const result = await onSendNow()
+            if (result?.error) { setSendStatus('error'); setSendError(result.error) }
+            else setSendStatus(result?.sent === false ? 'empty' : 'sent')
+        } catch {
+            setSendStatus('error')
+        }
+        setTimeout(() => { setSendStatus(null); setSendError(null) }, 5000)
+    }
+
+    const restDateObjs = settings.restDays.map(d => new Date(d + 'T00:00:00'))
+
+    return (
+        <section className="webex-settings-section">
+            <div className="webex-settings-header" onClick={() => setIsOpen(o => !o)}>
+                <span className="webex-icon">💬</span>
+                <span className="webex-title">Webex Digest</span>
+                {settings.webexRoomName && <span className="webex-room-badge">{settings.webexRoomName}</span>}
+                <span className="webex-chevron">{isOpen ? <MdExpandLess /> : <MdExpandMore />}</span>
+            </div>
+
+            {isOpen && (
+                <div className="webex-settings-body">
+                    <div className="settings-row">
+                        <label className="settings-label">Webex Token</label>
+                        <input
+                            type="password"
+                            className="text-input"
+                            value={webexToken}
+                            onChange={e => setWebexToken(e.target.value)}
+                            placeholder="Enter new token to update"
+                            autoComplete="new-password"
+                        />
+                    </div>
+
+                    <div className="settings-row">
+                        <label className="settings-label">Daily Digest Room</label>
+                        <input
+                            type="text"
+                            className="text-input"
+                            value={settings.webexRoomName}
+                            onChange={e => setSettings(s => ({ ...s, webexRoomName: e.target.value }))}
+                            placeholder="DailyReport"
+                        />
+                    </div>
+
+                    <div className="settings-row">
+                        <label className="settings-label">Realtime Room</label>
+                        <input
+                            type="text"
+                            className="text-input"
+                            value={settings.webexRealtimeRoomName}
+                            onChange={e => setSettings(s => ({ ...s, webexRealtimeRoomName: e.target.value }))}
+                            placeholder="RealTimeReport"
+                        />
+                    </div>
+
+                    <div className="settings-row">
+                        <label className="settings-label">Send Time</label>
+                        <input
+                            type="time"
+                            className="time-input"
+                            value={settings.sendTime}
+                            onChange={e => setSettings(s => ({ ...s, sendTime: e.target.value }))}
+                        />
+                    </div>
+
+                    <div className="settings-row">
+                        <label className="settings-label">Working Days</label>
+                        <div className="day-toggles">
+                            {DAY_LABELS.map((day, i) => (
+                                <button
+                                    key={i}
+                                    className={`day-toggle-btn${settings.workingDays.includes(i) ? ' active' : ''}`}
+                                    onClick={() => toggleDay(i)}
+                                >
+                                    {day}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="settings-row settings-row--top">
+                        <label className="settings-label">Rest Days</label>
+                        <div className="rest-days-col">
+                            <DatePicker
+                                onChange={onRestDayPick}
+                                highlightDates={restDateObjs}
+                                placeholderText="Click a date to mark as rest day"
+                                inline
+                                calendarClassName="rest-day-calendar"
+                            />
+                            {settings.restDays.length > 0 && (
+                                <div className="rest-days-chips">
+                                    {settings.restDays.map(d => (
+                                        <span key={d} className="rest-day-chip">
+                                            {d}
+                                            <button className="chip-remove" onClick={() => removeRestDay(d)}>×</button>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="settings-actions">
+                        <button className="settings-save-btn" onClick={onSave} disabled={isSaving}>
+                            {isSaving ? 'Saving…' : 'Save Settings'}
+                        </button>
+                        <button
+                            className={`settings-send-btn${sendStatus ? ` status-${sendStatus}` : ''}`}
+                            onClick={handleSendNow}
+                            disabled={sendStatus === 'sending'}
+                        >
+                            <MdSend />
+                            {sendStatus === 'sending' ? 'Sending…'
+                                : sendStatus === 'sent' ? 'Sent!'
+                                : sendStatus === 'empty' ? 'No tasks'
+                                : sendStatus === 'error' ? 'Failed'
+                                : 'Send Now'}
+                        </button>
+                        {saveMsg && (
+                            <span className={`settings-msg settings-msg--${saveMsg.type}`}>{saveMsg.text}</span>
+                        )}
+                        {sendError && (
+                            <span className="settings-msg settings-msg--error">{sendError}</span>
+                        )}
+                    </div>
+                </div>
+            )}
+        </section>
+    )
+}
+
 export function MemberSummary() {
     const boards = useSelector(s => s.boardModule.boards)
     const user = useSelector(s => s.userModule.user)
@@ -182,6 +442,7 @@ export function MemberSummary() {
     const [workspaceDisplay, setWorkspaceDisplay] = useState('board')
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+    const [progressConflict, setProgressConflict] = useState(null)
 
     useEffect(() => {
         loadBoards()
@@ -204,11 +465,44 @@ export function MemberSummary() {
         await loadBoards()
     }
 
-    async function onUpdateField(enrichedTask, field, value) {
+    async function _doUpdateField(enrichedTask, field, value) {
         const { boardId, boardTitle, groupId, groupTitle, groupColor, boardLabels, ...taskToSave } = enrichedTask
         taskToSave[field] = value
         await boardService.updateTask(boardId, groupId, taskToSave)
         await loadBoards()
+    }
+
+    async function onUpdateField(enrichedTask, field, value) {
+        if (field === 'status' && value === 'Progress') {
+            const currentProgressTask = allMemberTasks.find(
+                t => t.status === 'Progress' && t.id !== enrichedTask.id
+            )
+            if (currentProgressTask) {
+                setProgressConflict({
+                    currentTask: currentProgressTask,
+                    pendingTask: enrichedTask,
+                    pendingField: field,
+                    pendingValue: value
+                })
+                return
+            }
+        }
+        await _doUpdateField(enrichedTask, field, value)
+    }
+
+    async function onProgressConflictConfirm() {
+        const { currentTask, pendingTask, pendingField, pendingValue } = progressConflict
+        setProgressConflict(null)
+        await _doUpdateField(currentTask, 'status', 'Pause')
+        await _doUpdateField(pendingTask, pendingField, pendingValue)
+    }
+
+    function onProgressConflictCancel() {
+        setProgressConflict(null)
+    }
+
+    function onSendNow() {
+        return notificationService.sendNow()
     }
 
     async function onDragEnd(result) {
@@ -260,6 +554,7 @@ export function MemberSummary() {
                             onToggleToday={onToggleToday}
                             onUpdateField={onUpdateField}
                             icon={<BsSun />}
+                            onSendNow={onSendNow}
                         />
                         <TaskSection
                             sectionId="others"
@@ -281,9 +576,18 @@ export function MemberSummary() {
                         isStatic
                     />
                 </div>
+                <WebexSettingsSection onSendNow={onSendNow} user={user} />
             </main>
             {isLoginModalOpen && <LoginLogoutModal setIsLoginModalOpen={setIsLoginModalOpen} />}
             {isCreateModalOpen && <CreateBoard setIsCreateModalOpen={setIsCreateModalOpen} />}
+            {progressConflict && (
+                <ProgressConflictModal
+                    currentTask={progressConflict.currentTask}
+                    pendingTask={progressConflict.pendingTask}
+                    onConfirm={onProgressConflictConfirm}
+                    onCancel={onProgressConflictCancel}
+                />
+            )}
         </section>
     )
 }

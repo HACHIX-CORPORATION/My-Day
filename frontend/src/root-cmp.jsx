@@ -23,6 +23,14 @@ function RequireAuth({ children }) {
     return children
 }
 
+function HomeRedirect() {
+    const user = useSelector(s => s.userModule.user)
+    const isLoadingUser = useSelector(s => s.userModule.isLoadingUser)
+    if (isLoadingUser) return <Loader />
+    if (user) return <Navigate to={`/member/${user._id}`} replace />
+    return <HomePage />
+}
+
 export function RootCmp () {
     return (
         <Provider store={store}>
@@ -30,7 +38,7 @@ export function RootCmp () {
             <div>
                 <main>
                     <Routes>
-                        <Route element={<HomePage />} path='/' />
+                        <Route element={<HomeRedirect />} path='/' />
                         <Route element={<RequireAuth><BoardDetails /></RequireAuth>} path='/board/:boardId/' />
                         <Route element={<RequireAuth><BoardDetails /></RequireAuth>} path='/board/:boardId/:groupId/:taskId' />
                         <Route element={<RequireAuth><BoardDetails /></RequireAuth>} path='/board/:boardId/:activityLog' />

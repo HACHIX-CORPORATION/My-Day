@@ -44,14 +44,14 @@ export function LoginSignup() {
         ev.preventDefault()
         if (!credentials.username || !credentials.password) return
         try {
+            let loggedUser
             if (isSignup) {
                 if (!credentials.fullname) return
-                await signup(credentials)
+                loggedUser = await signup(credentials)
             } else {
-                await login(credentials)
+                loggedUser = await login(credentials)
             }
-            const boardId = boards[0]?._id
-            navigate(boardId ? `/board/${boardId}` : '/board')
+            navigate(`/member/${loggedUser._id}`)
         } catch (err) {
             setErrorMsg(isSignup ? 'Sign up failed. Username may already be taken.' : 'Incorrect username or password.')
         }
@@ -81,22 +81,23 @@ export function LoginSignup() {
         }
     }
 
-    function checkGoogleCredentials(credentials) {
-        const user = users.find(currUser => currUser.fullname === credentials.name && currUser.username === credentials.email)
-        if (user) login(user)
+    async function checkGoogleCredentials(credentials) {
+        const existing = users.find(currUser => currUser.fullname === credentials.name && currUser.username === credentials.email)
+        let loggedUser
+        if (existing) loggedUser = await login(existing)
         else {
-            signup({
+            loggedUser = await signup({
                 username: credentials.email,
                 password: credentials.id,
                 fullname: credentials.name,
                 imgUrl: credentials.picture
             })
         }
-        navigate(`/board/${boards[0]._id}`)
+        navigate(`/member/${loggedUser._id}`)
     }
 
     if (isLoadingUser) return <Loader />
-    if (user) return <Navigate to={boards[0]?._id ? `/board/${boards[0]._id}` : '/'} replace />
+    if (user) return <Navigate to={`/member/${user._id}`} replace />
 
     return (
         // TODO: Change header to the original header(option)

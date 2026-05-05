@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const path = require('path')
@@ -23,6 +24,7 @@ if (process.env.NODE_ENV === 'production') {
 const authRoutes = require('./api/auth/auth.routes')
 const userRoutes = require('./api/user/user.routes')
 const boardRoutes = require('./api/board/board.routes')
+const notificationRoutes = require('./api/notification/notification.routes')
 const {setupSocketAPI} = require('./services/socket.service')
 
 // routes
@@ -32,6 +34,7 @@ app.all('*', setupAsyncLocalStorage)
 app.use('/api/auth', authRoutes)
 app.use('/api/user', userRoutes)
 app.use('/api/board', boardRoutes)
+app.use('/api/notification', notificationRoutes)
 setupSocketAPI(http)
 
 app.get('/**', (req, res) => {
@@ -40,6 +43,9 @@ app.get('/**', (req, res) => {
 
 
 const logger = require('./services/logger.service')
+require('./services/scheduler.service').start()
+require('./api/board/board.service').addPauseLabelToBoards()
+
 const port = process.env.PORT || 3030
 http.listen(port, () => {
     logger.info('Server is running on port: ' + port)

@@ -1,3 +1,301 @@
+// ── Task-section header "Update" send button ─────────────────────────────────
+.task-section-header .send-now-header-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    padding: 4px 10px;
+    border: 1px solid $layout-border-color;
+    border-radius: 6px;
+    background: white;
+    color: $workspace-icon-color;
+    font-size: rem(12px);
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+
+    &:hover { background-color: $workspace-hover; color: $primary-text-color; }
+    &.status-sent  { background-color: #e6f4ea; color: #2e7d32; border-color: #a5d6a7; }
+    &.status-error { background-color: #fdecea; color: #c62828; border-color: #ef9a9a; }
+    &.status-empty { background-color: #fff8e1; color: #f57f17; border-color: #ffe082; }
+
+    .send-label { white-space: nowrap; }
+}
+
+// ── Webex Daily Digest settings section ──────────────────────────────────────
+.webex-settings-section {
+    margin-top: $spacing-xl;
+    border: 1px solid $layout-border-color;
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+
+    .webex-settings-header {
+        display: flex;
+        align-items: center;
+        gap: $spacing-small;
+        padding: $spacing-medium $spacing-large;
+        cursor: pointer;
+        user-select: none;
+        background: $app-bg;
+        border-bottom: 1px solid transparent;
+        transition: background-color 0.15s;
+
+        &:hover { background-color: $workspace-hover; }
+
+        .webex-icon { font-size: rem(18px); }
+
+        .webex-title {
+            font-size: rem(14px);
+            font-weight: 600;
+            color: $primary-text-color;
+        }
+
+        .webex-room-badge {
+            font-size: rem(12px);
+            color: $workspace-icon-color;
+            background: $workspace-hover;
+            border-radius: 10px;
+            padding: 2px 8px;
+        }
+
+        .webex-chevron {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            color: $workspace-icon-color;
+            font-size: rem(20px);
+        }
+    }
+
+    .webex-settings-body {
+        padding: $spacing-large;
+        border-top: 1px solid $layout-border-color;
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-large;
+    }
+
+    .settings-row {
+        display: flex;
+        align-items: center;
+        gap: $spacing-medium;
+
+        &--top { align-items: flex-start; }
+    }
+
+    .settings-label {
+        min-width: 120px;
+        font-size: rem(13px);
+        font-weight: 500;
+        color: $workspace-icon-color;
+    }
+
+    .room-fixed-label {
+        font-size: rem(13px);
+        font-weight: 600;
+        color: $primary-text-color;
+        background: $workspace-hover;
+        border-radius: 10px;
+        padding: 3px 12px;
+    }
+
+    .time-input {
+        height: 32px;
+        border: 1px solid $layout-border-color;
+        border-radius: 6px;
+        padding: 0 $spacing-small;
+        font-size: rem(13px);
+        color: $primary-text-color;
+
+        &:focus { outline: none; border-color: $board-btn; }
+    }
+
+    .day-toggles {
+        display: flex;
+        gap: $spacing-xs;
+        flex-wrap: wrap;
+    }
+
+    .day-toggle-btn {
+        padding: 4px 10px;
+        border: 1px solid $layout-border-color;
+        border-radius: 20px;
+        background: white;
+        color: $workspace-icon-color;
+        font-size: rem(12px);
+        cursor: pointer;
+        transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+
+        &:hover { background-color: $workspace-hover; }
+
+        &.active {
+            background-color: $color-egg_yolk;
+            border-color: $color-egg_yolk;
+            color: white;
+            font-weight: 600;
+        }
+    }
+
+    .rest-days-col {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-small;
+    }
+
+    .rest-day-calendar {
+        border: 1px solid $layout-border-color;
+        border-radius: 6px;
+        font-size: rem(12px);
+    }
+
+    .rest-days-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $spacing-xs;
+    }
+
+    .rest-day-chip {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        background: #fdecea;
+        border: 1px solid #ef9a9a;
+        border-radius: 12px;
+        font-size: rem(12px);
+        color: #c62828;
+
+        .chip-remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #c62828;
+            font-size: rem(14px);
+            line-height: 1;
+            padding: 0;
+            display: flex;
+            align-items: center;
+        }
+    }
+
+    .settings-actions {
+        display: flex;
+        align-items: center;
+        gap: $spacing-medium;
+        flex-wrap: wrap;
+    }
+
+    .settings-save-btn {
+        padding: 6px 16px;
+        border: none;
+        border-radius: 6px;
+        background: $board-btn;
+        color: white;
+        font-size: rem(13px);
+        font-weight: 500;
+        cursor: pointer;
+        transition: filter 0.15s;
+
+        &:hover:not(:disabled) { filter: brightness(0.9); }
+        &:disabled { opacity: 0.6; cursor: default; }
+    }
+
+    .settings-send-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 16px;
+        border: 1px solid $layout-border-color;
+        border-radius: 6px;
+        background: white;
+        color: $workspace-icon-color;
+        font-size: rem(13px);
+        cursor: pointer;
+        transition: background-color 0.15s, color 0.15s;
+
+        &:hover:not(:disabled) { background-color: $workspace-hover; color: $primary-text-color; }
+        &:disabled { opacity: 0.6; cursor: default; }
+        &.status-sent  { background-color: #e6f4ea; color: #2e7d32; border-color: #a5d6a7; }
+        &.status-error { background-color: #fdecea; color: #c62828; border-color: #ef9a9a; }
+        &.status-empty { background-color: #fff8e1; color: #f57f17; border-color: #ffe082; }
+    }
+
+    .settings-msg {
+        font-size: rem(12px);
+        padding: 4px 10px;
+        border-radius: 4px;
+
+        &--success { background: #e6f4ea; color: #2e7d32; }
+        &--error   { background: #fdecea; color: #c62828; }
+    }
+}
+
+// ── Progress conflict confirmation modal ──────────────────────────────────────
+.progress-conflict-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.progress-conflict-modal {
+    background: #fff;
+    border-radius: 8px;
+    padding: 2rem;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+
+    h3 {
+        margin: 0 0 0.75rem;
+        font-size: rem(16px);
+        color: $primary-text-color;
+    }
+
+    p {
+        margin: 0 0 1.5rem;
+        color: #444;
+        line-height: 1.5;
+        font-size: rem(14px);
+    }
+
+    .progress-conflict-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+
+        .btn-secondary {
+            padding: 6px 16px;
+            border: 1px solid $layout-border-color;
+            border-radius: 6px;
+            background: #fff;
+            color: $primary-text-color;
+            font-size: rem(13px);
+            cursor: pointer;
+            transition: background-color 0.15s;
+
+            &:hover { background-color: $workspace-hover; }
+        }
+
+        .btn-primary {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 6px;
+            background: $board-btn;
+            color: #fff;
+            font-size: rem(13px);
+            font-weight: 500;
+            cursor: pointer;
+            transition: filter 0.15s;
+
+            &:hover { filter: brightness(0.9); }
+        }
+    }
+}
+
 // Board task row uses .picker defined inside .task-preview — redeclare here
 .member-summary-main .picker {
     min-width: $cell-width;
