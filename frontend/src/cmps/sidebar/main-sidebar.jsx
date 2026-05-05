@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import { AiOutlineStar, AiOutlineMenu } from 'react-icons/ai'
 import { VscTriangleLeft } from 'react-icons/vsc'
-import { MdCheckCircle } from 'react-icons/md'
+import { MdCheckCircle, MdAdminPanelSettings } from 'react-icons/md'
 import { closeDynamicModal } from '../../store/board.actions'
 import WorkspaceIcon from './workspace-icon'
 import { Tooltip } from '@mui/material'
@@ -48,6 +48,13 @@ export function MainSidebar ({ setIsLoginModalOpen, setWorkspaceDisplay, setIsWo
                     <Tooltip title="My Tasks" arrow>
                         <Link to={`/member/${user._id}`} className='icon-container'>
                             <MdCheckCircle style={{ color: 'white' }} />
+                        </Link>
+                    </Tooltip>
+                )}
+                {user && user.username === 'admin@hachi-x.com' && (
+                    <Tooltip title="User Management" arrow>
+                        <Link to="/admin/users" className='icon-container'>
+                            <MdAdminPanelSettings style={{ color: 'white' }} />
                         </Link>
                     </Tooltip>
                 )}

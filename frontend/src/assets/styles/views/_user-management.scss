@@ -1,0 +1,129 @@
+.user-management-page {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.user-management-main {
+    flex: 1;
+    padding: $spacing-xl $spacing-xl * 2;
+    overflow-y: auto;
+}
+
+.user-management-title {
+    font-size: rem(24px);
+    font-weight: 700;
+    color: $primary-text-color;
+    margin-bottom: $spacing-xl;
+}
+
+.user-management-loading {
+    color: $workspace-icon-color;
+}
+
+.user-management-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+
+    th {
+        text-align: left;
+        padding: $spacing-medium $spacing-large;
+        background: $app-bg;
+        font-size: rem(12px);
+        font-weight: 600;
+        color: $workspace-icon-color;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-bottom: 1px solid $layout-border-color;
+    }
+
+    td {
+        padding: $spacing-medium $spacing-large;
+        border-bottom: 1px solid $layout-border-color;
+        vertical-align: middle;
+    }
+
+    tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    tbody tr:hover {
+        background: $workspace-hover;
+    }
+}
+
+.user-management-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-management-fullname {
+    font-weight: 500;
+    color: $primary-text-color;
+}
+
+.user-management-username {
+    color: $workspace-icon-color;
+    font-size: rem(13px);
+}
+
+.user-management-actions {
+    text-align: right;
+}
+
+.user-management-confirm {
+    display: flex;
+    align-items: center;
+    gap: $spacing-small;
+    justify-content: flex-end;
+
+    span {
+        font-size: rem(13px);
+        color: $primary-text-color;
+    }
+}
+
+.btn-delete {
+    padding: 5px 14px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    background: white;
+    color: #c62828;
+    font-size: rem(13px);
+    cursor: pointer;
+    transition: background-color 0.15s;
+
+    &:hover {
+        background: #fdecea;
+        border-color: #ef9a9a;
+    }
+}
+
+.btn-danger {
+    padding: 5px 14px;
+    border: 1px solid #ef9a9a;
+    border-radius: 6px;
+    background: #c62828;
+    color: white;
+    font-size: rem(13px);
+    cursor: pointer;
+
+    &:hover { background: #b71c1c; }
+}
+
+.btn-secondary {
+    padding: 5px 14px;
+    border: 1px solid $layout-border-color;
+    border-radius: 6px;
+    background: white;
+    color: $primary-text-color;
+    font-size: rem(13px);
+    cursor: pointer;
+
+    &:hover { background: $workspace-hover; }
+}

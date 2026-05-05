@@ -6,6 +6,7 @@ import { BoardDetails } from './pages/board-details'
 import HomePage from './pages/home-page'
 import { LoginSignup } from './pages/login-signup'
 import { MemberSummary } from './pages/member-summary'
+import { UserManagement } from './pages/user-management'
 import { store } from './store/store'
 import { initUser } from './store/user.actions'
 import { Loader } from './cmps/loader'
@@ -20,6 +21,14 @@ function RequireAuth({ children }) {
     const isLoadingUser = useSelector(s => s.userModule.isLoadingUser)
     if (isLoadingUser) return <Loader />
     if (!user) return <Navigate to="/auth/login" replace />
+    return children
+}
+
+function RequireAdmin({ children }) {
+    const user = useSelector(s => s.userModule.user)
+    const isLoadingUser = useSelector(s => s.userModule.isLoadingUser)
+    if (isLoadingUser) return <Loader />
+    if (!user || user.username !== 'admin@hachi-x.com') return <Navigate to="/" replace />
     return children
 }
 
@@ -45,6 +54,7 @@ export function RootCmp () {
                         <Route element={<LoginSignup />} path='/auth/login' />
                         <Route element={<LoginSignup />} path='/auth/signup' />
                         <Route element={<RequireAuth><MemberSummary /></RequireAuth>} path='/member/:memberId' />
+                        <Route element={<RequireAdmin><UserManagement /></RequireAdmin>} path='/admin/users' />
                     </Routes>
                 </main>
             </div>
