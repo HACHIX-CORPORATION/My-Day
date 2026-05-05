@@ -86,6 +86,7 @@ export async function initUser() {
         else sessionStorage.removeItem('loggedinUser')
         store.dispatch({ type: SET_USER, user: user || null })
     } catch (err) {
-        store.dispatch({ type: SET_USER, user: null })
+        const localUser = userService.getLoggedinUser()
+        store.dispatch({ type: SET_USER, user: localUser })
     }
 }
