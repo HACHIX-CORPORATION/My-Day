@@ -533,8 +533,6 @@ export function MemberSummary() {
         await loadBoards()
     }
 
-    if (!boards.length) return <Loader />
-
     return (
         <section className="member-summary flex">
             <div className="sidebar flex">
@@ -556,6 +554,15 @@ export function MemberSummary() {
                         <img className="member-avatar" src={user.imgUrl} alt={user.fullname} />
                     )}
                 </header>
+                {!boards.length && (
+                    <div className="empty-boards-state">
+                        <h2>No boards yet</h2>
+                        <p>Create your first board to get started.</p>
+                        <button className="btn-create-board" onClick={() => setIsCreateModalOpen(true)}>
+                            + Create Board
+                        </button>
+                    </div>
+                )}
                 <DragDropContext onDragEnd={onDragEnd}>
                     <div className="task-sections">
                         <TaskSection
