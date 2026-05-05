@@ -1,37 +1,18 @@
-import axios from 'axios'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { ImgUploader } from '../cmps/login/img-uploader'
 import { LoginPageHeader } from '../cmps/login/login-page-header'
 import { Link, useNavigate, Navigate } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import { loadUsers, login, signup } from '../store/user.actions'
-import { loadBoards } from '../store/board.actions'
-import { useGoogleLogin } from '@react-oauth/google'
+import { login, signup } from '../store/user.actions'
 import { Loader } from '../cmps/loader'
 
 export function LoginSignup() {
     const [credentials, setCredentials] = useState({ username: '', password: '', fullname: '' })
-    const [googleUser, setGoogleUser] = useState(null)
     const [isSignup, setIsSignup] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
     const navigate = useNavigate()
-    const boards = useSelector(storeState => storeState.boardModule.boards)
-    const users = useSelector(storeState => storeState.userModule.users)
     const user = useSelector(s => s.userModule.user)
     const isLoadingUser = useSelector(s => s.userModule.isLoadingUser)
-
-    const googleLogin = useGoogleLogin({
-        onSuccess: codeResponse => {
-            setGoogleUser(codeResponse)
-        },
-        onError: errorResponse => console.log(errorResponse)
-    })
-
-    useEffect(() => {
-        if (!users.length) loadUsers()
-        if (!boards.length) loadBoards()
-        onGoogleLogin()
-    }, [googleUser])
 
     function handleChange(ev) {
         const field = ev.target.name
@@ -65,44 +46,10 @@ export function LoginSignup() {
         setCredentials({ ...credentials, imgUrl })
     }
 
-    async function onGoogleLogin() {
-        try {
-            if (googleUser) {
-                const user = await axios.get(`https://www.googleapis.com/oauth2/v1/userinfo?access_token=${googleUser.access_token}`, {
-                    headers: {
-                        Authorization: `Bearer ${googleUser.access_token}`,
-                        Accept: 'application/json'
-                    }
-                })
-                checkGoogleCredentials(user.data)
-            }
-        } catch (error) {
-            console.log(error)
-        }
-    }
-
-    async function checkGoogleCredentials(credentials) {
-        const existing = users.find(currUser => currUser.fullname === credentials.name && currUser.username === credentials.email)
-        let loggedUser
-        if (existing) loggedUser = await login(existing)
-        else {
-            loggedUser = await signup({
-                username: credentials.email,
-                password: credentials.id,
-                fullname: credentials.name,
-                imgUrl: credentials.picture
-            })
-        }
-        navigate(`/member/${loggedUser._id}`)
-    }
-
     if (isLoadingUser) return <Loader />
     if (user) return <Navigate to={`/member/${user._id}`} replace />
 
     return (
-        // TODO: Change header to the original header(option)
-        // TODO: Change label to p
-        // TODO: fix image uplouder
         <div className="login-signup">
             <LoginPageHeader />
             <form className="form-container layout" onSubmit={(ev) => onSubmit(ev, isSignup)}>
@@ -110,7 +57,7 @@ export function LoginSignup() {
                 {isSignup && <ImgUploader onUploaded={onUploaded} />}
                 {!isSignup && <p className="login-explain">Enter your username and password</p>}
                 {isSignup && <p className="login-explain">Enter your full name, username and password</p>}
-                {isSignup && 
+                {isSignup &&
                 <input
                     type="text"
                     name="fullname"
@@ -141,15 +88,6 @@ export function LoginSignup() {
                 }
                 {errorMsg && <p className="login-error">{errorMsg}</p>}
                 <button className="btn-next">{isSignup ? 'Sign up' : 'Log in'}</button>
-                <div className="flex justify-center align-center split-line">
-                    <span className="separator-line"></span>
-                    <p>{isSignup ? 'Or sign up with' : 'Or sign in with'}</p>
-                    <span className="separator-line"></span>
-                </div>
-                <button className="btn-login-google" onClick={() => googleLogin()}>
-                    <img className="img-google-login" src="https://cdn.monday.com/images/logo_google_v2.svg" aria-hidden="true" alt="" />
-                    <span>Google</span>
-                </button>
                 <div className="suggest-signup">
                     <span className="suggest-signup-prefix">{isSignup ? 'Already have an account?' : 'Don\'t have an account yet?'}</span>
                     {!isSignup && <Link to={'/auth/signup'}><button className="btn-signup" onClick={toggleSignup}>Sign up</button></Link>}
