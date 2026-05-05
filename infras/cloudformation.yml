@@ -96,6 +96,11 @@ Resources:
           ToPort: 443
           CidrIp: '0.0.0.0/0'
           Description: HTTPS (after TLS cert is attached)
+        - IpProtocol: tcp
+          FromPort: 27017
+          ToPort: 27017
+          CidrIp: '0.0.0.0/0'
+          Description: MongoDB direct access for debugging (close when done)
       Tags:
         - Key: Name
           Value: !Sub 'myday-sg-${AWS::StackName}'
@@ -285,8 +290,8 @@ Resources:
 
           yum install -y mongodb-org
 
-          # Bind only to localhost - port 27017 is never exposed publicly.
-          sed -i 's/bindIp: 127.0.0.1/bindIp: 127.0.0.1/' /etc/mongod.conf
+          # Bind to all interfaces so Compass can connect directly via EC2 IP.
+          sed -i 's/bindIp: 127.0.0.1/bindIp: 0.0.0.0/' /etc/mongod.conf
 
           systemctl enable mongod
           systemctl start mongod

@@ -2,9 +2,10 @@ const authService = require('./auth.service')
 const logger = require('../../services/logger.service')
 
 const isProd = process.env.NODE_ENV === 'production'
+const isSecure = process.env.COOKIE_SECURE === 'true'
 const cookieOptions = {
-    sameSite: isProd ? 'None' : 'Lax',
-    secure: isProd,
+    sameSite: isSecure ? 'None' : 'Lax',
+    secure: isSecure,
     httpOnly: true
 }
 
