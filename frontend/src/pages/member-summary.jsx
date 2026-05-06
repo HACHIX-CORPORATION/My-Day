@@ -244,21 +244,19 @@ const GUEST_IMG = 'https://res.cloudinary.com/du63kkxhl/image/upload/v1675013009
 function ProfileSettingsSection({ user }) {
     const [isOpen, setIsOpen] = useState(false)
     const [fullname, setFullname] = useState(user?.fullname || '')
-    const [username, setUsername] = useState(user?.username || '')
     const [imgUrl, setImgUrl] = useState(user?.imgUrl || '')
     const [isSaving, setIsSaving] = useState(false)
     const [saveMsg, setSaveMsg] = useState(null)
 
     useEffect(() => {
         setFullname(user?.fullname || '')
-        setUsername(user?.username || '')
         setImgUrl(user?.imgUrl || '')
     }, [user])
 
     async function onSave() {
         setIsSaving(true)
         try {
-            await updateProfile({ _id: user._id, fullname, username, imgUrl })
+            await updateProfile({ _id: user._id, fullname, imgUrl })
             setSaveMsg({ type: 'success', text: 'Profile saved!' })
         } catch {
             setSaveMsg({ type: 'error', text: 'Failed to save profile' })
@@ -294,17 +292,6 @@ function ProfileSettingsSection({ user }) {
                             value={fullname}
                             onChange={e => setFullname(e.target.value)}
                             placeholder="Your full name"
-                        />
-                    </div>
-
-                    <div className="settings-row">
-                        <label className="settings-label">Username</label>
-                        <input
-                            type="text"
-                            className="text-input"
-                            value={username}
-                            onChange={e => setUsername(e.target.value)}
-                            placeholder="Your username"
                         />
                     </div>
 
