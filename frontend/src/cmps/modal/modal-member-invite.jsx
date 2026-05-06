@@ -12,43 +12,49 @@ export function ModalMemberInvite({ board, setIsInviteModalOpen }) {
     const [filter, setFilter] = useState({ txt: '' })
     const [outBoardMembers, setOutBoardMembers] = useState([])
     const users = useSelector(storeState => storeState.userModule.users)
+    const fullBoard = useSelector(storeState => storeState.boardModule.board)
 
     useEffect(() => {
         loadUsers()
     }, [])
 
     useEffect(() => {
-        setOutBoardMembers(users.filter(user => !board.members.some(member => member._id === user._id)))
+        setOutBoardMembers(users.filter(user => !(board.members || []).some(member => member._id === user._id)))
     }, [users, board])
 
     async function onRemoveMember(removeMemberId) {
         try {
-            board.members = board.members.filter(member => member._id !== removeMemberId)
-            board.groups.forEach(group => {
-                group.tasks.forEach(task => task.memberIds = removeMemberFromTask(task, removeMemberId))
-            })
-            await saveBoard(board)
-            loadBoard(board._id)
+            const boardToSave = {
+                ...fullBoard,
+                members: (fullBoard.members || []).filter(m => m._id !== removeMemberId),
+                groups: fullBoard.groups.map(group => ({
+                    ...group,
+                    tasks: group.tasks.map(task => ({
+                        ...task,
+                        memberIds: (task.memberIds || []).filter(id => id !== removeMemberId)
+                    }))
+                }))
+            }
+            await saveBoard(boardToSave)
+            loadBoard(boardToSave._id)
             setIsInviteModalOpen(false)
         } catch (err) {
             console.log('cant save board:', err)
         }
-    }
-
-    function removeMemberFromTask(task, removeMemberId) {
-        return task.memberIds.filter(memberId => memberId !== removeMemberId)
     }
 
     async function onAddMember(member) {
         try {
-            board.members.push(member)
-            await saveBoard(board)
-            loadBoard(board._id)
+            const boardToSave = {
+                ...fullBoard,
+                members: [...(fullBoard.members || []), member]
+            }
+            await saveBoard(boardToSave)
+            loadBoard(boardToSave._id)
             setIsInviteModalOpen(false)
         } catch (err) {
             console.log('cant save board:', err)
         }
-        
     }
 
     function handleChange({ target }) {
@@ -58,7 +64,7 @@ export function ModalMemberInvite({ board, setIsInviteModalOpen }) {
 
     function onSubmit(ev) {
         ev.preventDefault()
-        let members = users.filter(user => !board.members.some(member => member._id === user._id))
+        let members = users.filter(user => !(board.members || []).some(member => member._id === user._id))
         if (filter.txt) {
             const regex = new RegExp(filter.txt, 'i')
             members = members.filter(member => regex.test(member.fullname))
@@ -74,7 +80,7 @@ export function ModalMemberInvite({ board, setIsInviteModalOpen }) {
             <section className="modal-member-content" >
                 <ul className="taskMembers flex">
                     {
-                        board.members.map(member => {
+                        (board.members || []).map(member => {
                             return <li key={member._id}>
                                 <img src={member.imgUrl} alt="member-img" />
                                 <span>{member.fullname}</span>
