@@ -49,7 +49,9 @@ async function logout(req, res){
 }
 
 async function getLoggedinUser(req, res) {
+    logger.debug(`loggedin - cookies: ${JSON.stringify(req.cookies)}`)
     const loggedinUser = authService.validateToken(req.cookies.loginToken)
+    logger.debug(`loggedin - user: ${JSON.stringify(loggedinUser)}`)
     res.json(loggedinUser || null)
 }
 
