@@ -247,11 +247,25 @@ function ProfileSettingsSection({ user }) {
     const [imgUrl, setImgUrl] = useState(user?.imgUrl || '')
     const [isSaving, setIsSaving] = useState(false)
     const [saveMsg, setSaveMsg] = useState(null)
+    const [imgSaveMsg, setImgSaveMsg] = useState(null)
 
     useEffect(() => {
         setFullname(user?.fullname || '')
         setImgUrl(user?.imgUrl || '')
     }, [user])
+
+    async function onImgUploaded(url) {
+        setImgUrl(url)
+        setImgSaveMsg({ type: 'saving', text: 'Saving…' })
+        try {
+            await updateProfile({ _id: user._id, fullname, imgUrl: url })
+            setImgSaveMsg({ type: 'success', text: 'Saved!' })
+        } catch {
+            setImgSaveMsg({ type: 'error', text: 'Failed to save' })
+        } finally {
+            setTimeout(() => setImgSaveMsg(null), 3000)
+        }
+    }
 
     async function onSave() {
         setIsSaving(true)
@@ -280,7 +294,12 @@ function ProfileSettingsSection({ user }) {
                         <label className="settings-label">Avatar</label>
                         <div className="profile-avatar-wrapper">
                             <img className="profile-preview-img" src={imgUrl || GUEST_IMG} alt="avatar" />
-                            <ImgUploader onUploaded={url => setImgUrl(url)} />
+                            <div className="profile-uploader-col">
+                                <ImgUploader onUploaded={onImgUploaded} />
+                                {imgSaveMsg && (
+                                    <span className={`settings-msg settings-msg--${imgSaveMsg.type}`}>{imgSaveMsg.text}</span>
+                                )}
+                            </div>
                         </div>
                     </div>
 

@@ -219,6 +219,7 @@
 
         &--success { background: #e6f4ea; color: #2e7d32; }
         &--error   { background: #fdecea; color: #c62828; }
+        &--saving  { background: #e3f2fd; color: #1565c0; }
     }
 }
 
@@ -312,12 +313,19 @@
 
         &--success { background: #e6f4ea; color: #2e7d32; }
         &--error   { background: #fdecea; color: #c62828; }
+        &--saving  { background: #e3f2fd; color: #1565c0; }
     }
 
     .profile-avatar-wrapper {
         display: flex;
         align-items: center;
         gap: $spacing-medium;
+    }
+
+    .profile-uploader-col {
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-xs;
     }
 
     .profile-preview-img {
