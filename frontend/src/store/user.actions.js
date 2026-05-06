@@ -5,6 +5,13 @@ import { store } from '../store/store.js'
 import { LOADING_DONE, LOADING_START } from "./system.reducer.js";
 import { REMOVE_USER, SET_USER, SET_USERS, SET_WATCHED_USER } from "./user.reducer.js";
 
+export async function updateProfile(user) {
+    const updated = await userService.updateUser(user)
+    userService.saveLocalUser(updated)
+    store.dispatch({ type: SET_USER, user: updated })
+    return updated
+}
+
 export async function loadUsers() {
     try {
         store.dispatch({ type: LOADING_START })

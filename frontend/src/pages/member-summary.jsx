@@ -5,7 +5,8 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd'
 import DatePicker from 'react-datepicker'
 
 import { loadBoards } from '../store/board.actions'
-import { loadUsers } from '../store/user.actions'
+import { loadUsers, updateProfile } from '../store/user.actions'
+import { ImgUploader } from '../cmps/login/img-uploader'
 import { boardService } from '../services/board.service'
 import { notificationService } from '../services/notification.service'
 import { userService } from '../services/user.service'
@@ -238,6 +239,88 @@ function TaskSection({ sectionId, title, tasks, onToggleToday, onUpdateField, ic
 }
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const GUEST_IMG = 'https://res.cloudinary.com/du63kkxhl/image/upload/v1675013009/guest_f8d60j.png'
+
+function ProfileSettingsSection({ user }) {
+    const [isOpen, setIsOpen] = useState(false)
+    const [fullname, setFullname] = useState(user?.fullname || '')
+    const [username, setUsername] = useState(user?.username || '')
+    const [imgUrl, setImgUrl] = useState(user?.imgUrl || '')
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveMsg, setSaveMsg] = useState(null)
+
+    useEffect(() => {
+        setFullname(user?.fullname || '')
+        setUsername(user?.username || '')
+        setImgUrl(user?.imgUrl || '')
+    }, [user])
+
+    async function onSave() {
+        setIsSaving(true)
+        try {
+            await updateProfile({ _id: user._id, fullname, username, imgUrl })
+            setSaveMsg({ type: 'success', text: 'Profile saved!' })
+        } catch {
+            setSaveMsg({ type: 'error', text: 'Failed to save profile' })
+        } finally {
+            setIsSaving(false)
+            setTimeout(() => setSaveMsg(null), 3000)
+        }
+    }
+
+    return (
+        <section className="profile-settings-section">
+            <div className="profile-settings-header" onClick={() => setIsOpen(o => !o)}>
+                <span className="profile-icon">👤</span>
+                <span className="profile-title">Profile</span>
+                <span className="profile-chevron">{isOpen ? <MdExpandLess /> : <MdExpandMore />}</span>
+            </div>
+
+            {isOpen && (
+                <div className="profile-settings-body">
+                    <div className="settings-row settings-row--top">
+                        <label className="settings-label">Avatar</label>
+                        <div className="profile-avatar-wrapper">
+                            <img className="profile-preview-img" src={imgUrl || GUEST_IMG} alt="avatar" />
+                            <ImgUploader onUploaded={url => setImgUrl(url)} />
+                        </div>
+                    </div>
+
+                    <div className="settings-row">
+                        <label className="settings-label">Full Name</label>
+                        <input
+                            type="text"
+                            className="text-input"
+                            value={fullname}
+                            onChange={e => setFullname(e.target.value)}
+                            placeholder="Your full name"
+                        />
+                    </div>
+
+                    <div className="settings-row">
+                        <label className="settings-label">Username</label>
+                        <input
+                            type="text"
+                            className="text-input"
+                            value={username}
+                            onChange={e => setUsername(e.target.value)}
+                            placeholder="Your username"
+                        />
+                    </div>
+
+                    <div className="settings-actions">
+                        <button className="settings-save-btn" onClick={onSave} disabled={isSaving}>
+                            {isSaving ? 'Saving…' : 'Save Profile'}
+                        </button>
+                        {saveMsg && (
+                            <span className={`settings-msg settings-msg--${saveMsg.type}`}>{saveMsg.text}</span>
+                        )}
+                    </div>
+                </div>
+            )}
+        </section>
+    )
+}
 
 function WebexSettingsSection({ onSendNow, user }) {
     const [isOpen, setIsOpen] = useState(false)
@@ -325,8 +408,7 @@ function WebexSettingsSection({ onSendNow, user }) {
         <section className="webex-settings-section">
             <div className="webex-settings-header" onClick={() => setIsOpen(o => !o)}>
                 <span className="webex-icon">💬</span>
-                <span className="webex-title">Webex Digest</span>
-                {settings.webexRoomName && <span className="webex-room-badge">{settings.webexRoomName}</span>}
+                <span className="webex-title">Webex</span>
                 <span className="webex-chevron">{isOpen ? <MdExpandLess /> : <MdExpandMore />}</span>
             </div>
 
@@ -594,6 +676,7 @@ export function MemberSummary() {
                         isStatic
                     />
                 </div>
+                <ProfileSettingsSection user={user} />
                 <WebexSettingsSection onSendNow={onSendNow} user={user} />
             </main>
             {isLoginModalOpen && <LoginLogoutModal setIsLoginModalOpen={setIsLoginModalOpen} />}

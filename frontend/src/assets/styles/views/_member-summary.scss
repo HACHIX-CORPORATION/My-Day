@@ -50,14 +50,6 @@
             color: $primary-text-color;
         }
 
-        .webex-room-badge {
-            font-size: rem(12px);
-            color: $workspace-icon-color;
-            background: $workspace-hover;
-            border-radius: 10px;
-            padding: 2px 8px;
-        }
-
         .webex-chevron {
             margin-left: auto;
             display: flex;
@@ -227,6 +219,67 @@
 
         &--success { background: #e6f4ea; color: #2e7d32; }
         &--error   { background: #fdecea; color: #c62828; }
+    }
+}
+
+// ── Profile settings section ─────────────────────────────────────────────────
+.profile-settings-section {
+    margin-top: $spacing-xl;
+    border: 1px solid $layout-border-color;
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+
+    .profile-settings-header {
+        display: flex;
+        align-items: center;
+        gap: $spacing-small;
+        padding: $spacing-medium $spacing-large;
+        cursor: pointer;
+        user-select: none;
+        background: $app-bg;
+        border-bottom: 1px solid transparent;
+        transition: background-color 0.15s;
+
+        &:hover { background-color: $workspace-hover; }
+
+        .profile-icon { font-size: rem(18px); }
+
+        .profile-title {
+            font-size: rem(14px);
+            font-weight: 600;
+            color: $primary-text-color;
+        }
+
+        .profile-chevron {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            color: $workspace-icon-color;
+            font-size: rem(20px);
+        }
+    }
+
+    .profile-settings-body {
+        padding: $spacing-large;
+        border-top: 1px solid $layout-border-color;
+        display: flex;
+        flex-direction: column;
+        gap: $spacing-large;
+    }
+
+    .profile-avatar-wrapper {
+        display: flex;
+        align-items: center;
+        gap: $spacing-medium;
+    }
+
+    .profile-preview-img {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid $layout-border-color;
     }
 }
 
