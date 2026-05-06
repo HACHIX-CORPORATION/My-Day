@@ -1,39 +1,54 @@
 import { useState } from 'react'
-import { uploadService } from '../../services/upload.service'
+
 const guest = "https://res.cloudinary.com/du63kkxhl/image/upload/v1675013009/guest_f8d60j.png"
 
-export function ImgUploader({ onUploaded = null }) {
-  const [imgData, setImgData] = useState({
-    imgUrl: null,
-    height: 500,
-    width: 500,
+function resizeToBase64(file, maxSize = 200, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = reject
+    reader.onload = ev => {
+      const img = new Image()
+      img.onerror = reject
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height))
+        const w = Math.round(img.width * scale)
+        const h = Math.round(img.height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = ev.target.result
+    }
+    reader.readAsDataURL(file)
   })
+}
+
+export function ImgUploader({ onUploaded = null }) {
+  const [preview, setPreview] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
 
-  async function uploadImg(ev) {
+  async function handleFile(ev) {
+    const file = ev.target.files[0]
+    if (!file) return
     setIsUploading(true)
-    const { secure_url, height, width } = await uploadService.uploadImg(ev)
-    setImgData({ imgUrl: secure_url, width, height })
+    const base64 = await resizeToBase64(file)
+    setPreview(base64)
     setIsUploading(false)
-    onUploaded && onUploaded(secure_url)
+    onUploaded && onUploaded(base64)
   }
 
-  function getUploadLabel() {
-    if (imgData.imgUrl) return 'Upload Another?'
-    return isUploading ? 'Uploading....' : 'Upload a profile picture'
-  }
-
-  // TODO: fix all
   return (
     <div className="upload-preview">
       <div className='img-picker'>
-        {getUploadLabel()}
+        {preview ? 'Upload Another?' : isUploading ? 'Uploading....' : 'Upload a profile picture'}
         <label htmlFor="imgUpload">
-          {!imgData.imgUrl && <img className="guest-img" src={guest} style={{ maxWidth: '200px', float: 'right' }} alt="" />}
-          {imgData.imgUrl && <img className="user-img" src={imgData.imgUrl} style={{ maxWidth: '100px', float: 'right' }} alt="" />}
+          {!preview && <img className="guest-img" src={guest} style={{ maxWidth: '200px', float: 'right' }} alt="" />}
+          {preview && <img className="user-img" src={preview} style={{ maxWidth: '100px', float: 'right' }} alt="" />}
         </label>
       </div>
-      <input type="file" onChange={uploadImg} accept="img/*" id="imgUpload" />
+      <input type="file" onChange={handleFile} accept="image/*" id="imgUpload" />
     </div>
   )
 }
