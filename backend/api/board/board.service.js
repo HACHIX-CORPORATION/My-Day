@@ -100,7 +100,7 @@ async function updateTask(boardId, groupId, taskId, saveTask){
             saveTask.progressStartedAt = null
         }
 
-        group.tasks = group.tasks.map(task => (task.id === taskId) ? saveTask : task)
+        group.tasks = group.tasks.map(task => (task.id === taskId) ? { ...saveTask, id: taskId } : task)
         await update(board)
 
         // All Webex notifications are fire-and-forget so the PUT returns immediately
@@ -223,6 +223,34 @@ async function normalizeBoardLabels() {
     }
 }
 
+async function normalizeTaskIds() {
+    function makeId(length = 6) {
+        let id = ''
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+        for (let i = 0; i < length; i++) id += chars.charAt(Math.floor(Math.random() * chars.length))
+        return id
+    }
+    try {
+        const collection = await dbService.getCollection('board')
+        const boards = await collection.find({}).toArray()
+        for (const board of boards) {
+            let dirty = false
+            for (const group of (board.groups || [])) {
+                for (const task of (group.tasks || [])) {
+                    if (!task.id) { task.id = makeId(); dirty = true }
+                }
+            }
+            if (dirty) {
+                const { _id, ...boardToSave } = board
+                await collection.updateOne({ _id }, { $set: boardToSave })
+            }
+        }
+        logger.info('Task IDs migration complete')
+    } catch (err) {
+        logger.error('Task IDs migration failed', err)
+    }
+}
+
 async function normalizeTimeCmps() {
     try {
         const collection = await dbService.getCollection('board')
@@ -255,5 +283,6 @@ module.exports = {
     updateTask,
     updateGroup,
     normalizeBoardLabels,
-    normalizeTimeCmps
+    normalizeTimeCmps,
+    normalizeTaskIds
 }

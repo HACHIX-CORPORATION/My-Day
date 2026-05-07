@@ -46,6 +46,7 @@ const logger = require('./services/logger.service')
 require('./services/scheduler.service').start()
 require('./api/board/board.service').normalizeBoardLabels()
 require('./api/board/board.service').normalizeTimeCmps()
+require('./api/board/board.service').normalizeTaskIds()
 
 const port = process.env.PORT || 3030
 http.listen(port, () => {
