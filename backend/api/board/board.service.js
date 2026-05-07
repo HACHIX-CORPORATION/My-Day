@@ -100,37 +100,15 @@ async function updateTask(boardId, groupId, taskId, saveTask){
             saveTask.progressStartedAt = null
         }
 
-        // Handle Progress start synchronously so webexThreadId is written in the
-        // same DB update — prevents the race condition where loadBoards() returns
-        // before the separate _saveWebexThreadId write completes.
-        if (webexToken && newStatus === 'Progress' && oldStatus !== 'Progress') {
-            if (oldStatus === 'Pause' && existingThreadId) {
-                try {
-                    await webexService.sendThreadReply(existingThreadId, `▶️ Resumed by **${who}**`, realtimeRoom, webexToken)
-                    saveTask.webexThreadId = existingThreadId
-                } catch {
-                    const msg = await webexService.sendMessage(
-                        `## 🚀 In Progress\n**${saveTask.title}** — started by **${who}**\nBoard: ${board.title} | Group: ${group.title}`,
-                        realtimeRoom,
-                        webexToken
-                    )
-                    saveTask.webexThreadId = msg.id
-                }
-            } else {
-                const msg = await webexService.sendMessage(
-                    `## 🚀 In Progress\n**${saveTask.title}** — started by **${who}**\nBoard: ${board.title} | Group: ${group.title}`,
-                    realtimeRoom,
-                    webexToken
-                )
-                saveTask.webexThreadId = msg.id
-            }
-        }
-
         group.tasks = group.tasks.map(task => (task.id === taskId) ? saveTask : task)
         await update(board)
 
-        // Pause and Done replies don't need a DB write — fire-and-forget is fine
+        // All Webex notifications are fire-and-forget so the PUT returns immediately
         if (webexToken) {
+            if (newStatus === 'Progress' && oldStatus !== 'Progress') {
+                _handleProgressStartNotification(boardId, groupId, taskId, saveTask, board, group, who, realtimeRoom, webexToken, oldStatus, existingThreadId)
+                    .catch(err => logger.error('Progress Webex notification failed', err))
+            }
             _handleStopDoneNotification(oldStatus, newStatus, existingThreadId, who, webexToken, realtimeRoom)
                 .catch(err => logger.error('WebEx notification failed', err))
         }
@@ -139,6 +117,37 @@ async function updateTask(boardId, groupId, taskId, saveTask){
     } catch (err) {
         logger.error(`cannot update task ${taskId}`, err)
         throw err
+    }
+}
+
+async function _handleProgressStartNotification(boardId, groupId, taskId, saveTask, board, group, who, realtimeRoom, webexToken, oldStatus, existingThreadId) {
+    let threadId
+    if (oldStatus === 'Pause' && existingThreadId) {
+        try {
+            await webexService.sendThreadReply(existingThreadId, `▶️ Resumed by **${who}**`, realtimeRoom, webexToken)
+            threadId = existingThreadId
+        } catch {
+            const msg = await webexService.sendMessage(
+                `## 🚀 In Progress\n**${saveTask.title}** — started by **${who}**\nBoard: ${board.title} | Group: ${group.title}`,
+                realtimeRoom, webexToken
+            )
+            threadId = msg.id
+        }
+    } else {
+        const msg = await webexService.sendMessage(
+            `## 🚀 In Progress\n**${saveTask.title}** — started by **${who}**\nBoard: ${board.title} | Group: ${group.title}`,
+            realtimeRoom, webexToken
+        )
+        threadId = msg.id
+    }
+
+    if (!threadId) return
+    const boardToUpdate = await getById(boardId)
+    const g = boardToUpdate.groups.find(gr => gr.id === groupId)
+    const t = g?.tasks.find(ta => ta.id === taskId)
+    if (t) {
+        t.webexThreadId = threadId
+        await update(boardToUpdate)
     }
 }
 

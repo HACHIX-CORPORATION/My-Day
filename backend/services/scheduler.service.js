@@ -47,7 +47,7 @@ async function _getTodayTasksForUser(userId, todayStr) {
     boards.forEach(board => {
         board.groups?.forEach(group => {
             group.tasks?.forEach(task => {
-                const hasMember = task.memberIds?.includes(userId)
+                const hasMember = task.memberIds?.some(id => String(id) === String(userId))
                 const notDone = task.status !== 'Done'
                 const isToday = _isTaskToday(task, todayStr)
                 if (hasMember && notDone && isToday) {
